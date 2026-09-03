@@ -6,12 +6,136 @@ definitions:
         example: ok
         type: string
     type: object
+  handlers.LoginRequest:
+    properties:
+      email:
+        example: admin@example.com
+        type: string
+      password:
+        example: password
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  handlers.LoginResponse:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        example: 900
+        type: integer
+      token_type:
+        example: Bearer
+        type: string
+      user:
+        $ref: '#/definitions/handlers.UserResponse'
+    type: object
+  handlers.UserResponse:
+    properties:
+      email:
+        example: admin@example.com
+        type: string
+      id:
+        example: 1
+        type: integer
+      name:
+        example: Admin User
+        type: string
+      role:
+        example: admin
+        type: string
+    type: object
 info:
   contact: {}
   description: Backend API for the Construction Project Manager application.
   title: CPM API
   version: "0.1"
 paths:
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Validates credentials and returns an access token; sets an httpOnly
+        refresh-token cookie.
+      parameters:
+      - description: Credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Log in
+      tags:
+      - auth
+  /api/v1/auth/logout:
+    post:
+      description: Revokes the current refresh token and clears its cookie.
+      responses:
+        "204":
+          description: No Content
+      summary: Log out
+      tags:
+      - auth
+  /api/v1/auth/refresh:
+    post:
+      description: Rotates the refresh-token cookie and returns a new access token.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.LoginResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Refresh access token
+      tags:
+      - auth
+  /api/v1/me:
+    get:
+      description: Returns the authenticated user's profile.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.UserResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Current user
+      tags:
+      - auth
   /health:
     get:
       description: Returns service status, used for uptime checks and CI/CD deploy
@@ -26,4 +150,9 @@ paths:
       summary: Health check
       tags:
       - system
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

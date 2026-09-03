@@ -33,7 +33,7 @@ func Load() *Config {
 		log.Println("no .env file found, relying on environment variables")
 	}
 
-	return &Config{
+	cfg := &Config{
 		AppEnv:     getEnv("APP_ENV", "local"),
 		AppPort:    getEnv("APP_PORT", "8080"),
 		DBHost:     getEnv("DB_HOST", "localhost"),
@@ -51,6 +51,12 @@ func Load() *Config {
 		AdminEmail:    getEnv("ADMIN_EMAIL", ""),
 		AdminPassword: getEnv("ADMIN_PASSWORD", ""),
 	}
+
+	if len(cfg.JWTSecret) < 32 {
+		log.Fatalf("JWT_SECRET must be set to a random string of at least 32 characters (got %d chars) — generate one with: openssl rand -base64 48", len(cfg.JWTSecret))
+	}
+
+	return cfg
 }
 
 func getEnv(key, fallback string) string {

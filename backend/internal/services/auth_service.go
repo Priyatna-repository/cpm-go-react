@@ -68,22 +68,26 @@ func (s *AuthService) Login(email, password string) (*models.User, *TokenPair, e
 
 func (s *AuthService) Refresh(rawToken string) (*models.User, *TokenPair, error) {
 	hash := hashToken(rawToken)
+	now := time.Now()
+
+	result := s.db.Model(&models.RefreshToken{}).
+		Where("token_hash = ? AND revoked_at IS NULL AND expires_at > ?", hash, now).
+		Update("revoked_at", now)
+	if result.Error != nil {
+		return nil, nil, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil, nil, ErrInvalidRefreshToken
+	}
 
 	var stored models.RefreshToken
 	if err := s.db.Where("token_hash = ?", hash).First(&stored).Error; err != nil {
-		return nil, nil, ErrInvalidRefreshToken
-	}
-	if stored.RevokedAt != nil || time.Now().After(stored.ExpiresAt) {
 		return nil, nil, ErrInvalidRefreshToken
 	}
 
 	var user models.User
 	if err := s.db.Preload("Role").First(&user, stored.UserID).Error; err != nil {
 		return nil, nil, ErrInvalidRefreshToken
-	}
-
-	if err := s.db.Model(&stored).Update("revoked_at", time.Now()).Error; err != nil {
-		return nil, nil, err
 	}
 
 	pair, err := s.issueTokenPair(&user)
@@ -98,6 +102,14 @@ func (s *AuthService) Logout(rawToken string) error {
 	return s.db.Model(&models.RefreshToken{}).
 		Where("token_hash = ? AND revoked_at IS NULL", hash).
 		Update("revoked_at", time.Now()).Error
+}
+
+func (s *AuthService) GetUserByID(id uint) (*models.User, error) {
+	var user models.User
+	if err := s.db.First(&user, id).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
 }
 
 func (s *AuthService) ParseAccessToken(raw string) (*Claims, error) {

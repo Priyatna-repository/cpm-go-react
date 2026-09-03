@@ -19,7 +19,7 @@ func Setup(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	authService := services.NewAuthService(db, cfg)
-	authHandler := handlers.NewAuthHandler(authService, cfg, db)
+	authHandler := handlers.NewAuthHandler(authService, cfg)
 
 	api := r.Group("/api/v1")
 	{

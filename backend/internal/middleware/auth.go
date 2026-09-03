@@ -45,8 +45,13 @@ func RequireRole(roles ...string) gin.HandlerFunc {
 	}
 
 	return func(c *gin.Context) {
-		role, _ := c.Get(ContextRole)
-		if _, ok := allowed[role.(string)]; !ok {
+		value, exists := c.Get(ContextRole)
+		role, ok := value.(string)
+		if !exists || !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing authentication context"})
+			return
+		}
+		if _, ok := allowed[role]; !ok {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "insufficient role"})
 			return
 		}

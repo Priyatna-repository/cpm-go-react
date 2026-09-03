@@ -10,7 +10,6 @@ import (
 	"github.com/Priyatna-repository/cpm-go-react/backend/internal/models"
 	"github.com/Priyatna-repository/cpm-go-react/backend/internal/services"
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 const refreshCookieName = "refresh_token"
@@ -18,11 +17,10 @@ const refreshCookieName = "refresh_token"
 type AuthHandler struct {
 	auth *services.AuthService
 	cfg  *config.Config
-	db   *gorm.DB
 }
 
-func NewAuthHandler(auth *services.AuthService, cfg *config.Config, db *gorm.DB) *AuthHandler {
-	return &AuthHandler{auth: auth, cfg: cfg, db: db}
+func NewAuthHandler(auth *services.AuthService, cfg *config.Config) *AuthHandler {
+	return &AuthHandler{auth: auth, cfg: cfg}
 }
 
 type LoginRequest struct {
@@ -124,16 +122,19 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 // @Failure      401  {object}  map[string]string
 // @Router       /api/v1/me [get]
 func (h *AuthHandler) Me(c *gin.Context) {
-	userID, _ := c.Get(middleware.ContextUserID)
-	role, _ := c.Get(middleware.ContextRole)
+	userIDVal, _ := c.Get(middleware.ContextUserID)
+	roleVal, _ := c.Get(middleware.ContextRole)
 
-	var user models.User
-	if err := h.db.First(&user, userID).Error; err != nil {
+	id, _ := userIDVal.(uint)
+	role, _ := roleVal.(string)
+
+	user, err := h.auth.GetUserByID(id)
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 		return
 	}
 
-	c.JSON(http.StatusOK, UserResponse{ID: user.ID, Name: user.Name, Email: user.Email, Role: role.(string)})
+	c.JSON(http.StatusOK, UserResponse{ID: user.ID, Name: user.Name, Email: user.Email, Role: role})
 }
 
 func toLoginResponse(user *models.User, pair *services.TokenPair) LoginResponse {

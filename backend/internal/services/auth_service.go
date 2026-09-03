@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -13,12 +14,16 @@ import (
 	"github.com/Priyatna-repository/cpm-go-react/backend/internal/models"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+	"google.golang.org/api/idtoken"
 	"gorm.io/gorm"
 )
 
 var (
 	ErrInvalidCredentials  = errors.New("invalid email or password")
 	ErrInvalidRefreshToken = errors.New("invalid or expired refresh token")
+	ErrInvalidGoogleToken  = errors.New("invalid google token")
+	ErrGoogleUserNotFound  = errors.New("no user found with this google account")
+	ErrGoogleNotConfigured = errors.New("google sign-in is not configured")
 )
 
 // dummyHash lets Login run a bcrypt compare even when the email doesn't
@@ -50,7 +55,7 @@ type TokenPair struct {
 
 func (s *AuthService) Login(email, password string) (*models.User, *TokenPair, error) {
 	var user models.User
-	if err := s.db.Preload("Role").Where("email = ?", email).First(&user).Error; err != nil {
+	if err := s.db.Preload("Role").Where("LOWER(email) = LOWER(?)", email).First(&user).Error; err != nil {
 		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
 		return nil, nil, ErrInvalidCredentials
 	}
@@ -88,6 +93,54 @@ func (s *AuthService) Refresh(rawToken string) (*models.User, *TokenPair, error)
 	var user models.User
 	if err := s.db.Preload("Role").First(&user, stored.UserID).Error; err != nil {
 		return nil, nil, ErrInvalidRefreshToken
+	}
+
+	pair, err := s.issueTokenPair(&user)
+	if err != nil {
+		return nil, nil, err
+	}
+	return &user, pair, nil
+}
+
+// GoogleLogin verifies a Google Identity Services ID token and logs in an
+// EXISTING user matched by google_id (or, failing that, by a *verified*
+// email — which backfills google_id). It never creates a new user, matching
+// the reference app's behavior.
+func (s *AuthService) GoogleLogin(ctx context.Context, idTokenStr string) (*models.User, *TokenPair, error) {
+	if s.cfg.GoogleClientID == "" {
+		return nil, nil, ErrGoogleNotConfigured
+	}
+
+	payload, err := idtoken.Validate(ctx, idTokenStr, s.cfg.GoogleClientID)
+	if err != nil {
+		return nil, nil, ErrInvalidGoogleToken
+	}
+
+	googleID, _ := payload.Claims["sub"].(string)
+	email, _ := payload.Claims["email"].(string)
+	emailVerified, _ := payload.Claims["email_verified"].(bool)
+	if googleID == "" || email == "" {
+		return nil, nil, ErrInvalidGoogleToken
+	}
+
+	var user models.User
+	err = s.db.Preload("Role").Where("google_id = ?", googleID).First(&user).Error
+	switch {
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		if !emailVerified {
+			return nil, nil, ErrGoogleUserNotFound
+		}
+		if err := s.db.Preload("Role").Where("LOWER(email) = LOWER(?)", email).First(&user).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, nil, ErrGoogleUserNotFound
+			}
+			return nil, nil, err
+		}
+		if err := s.db.Model(&user).Update("google_id", googleID).Error; err != nil {
+			return nil, nil, err
+		}
+	case err != nil:
+		return nil, nil, err
 	}
 
 	pair, err := s.issueTokenPair(&user)

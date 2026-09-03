@@ -40,6 +40,21 @@ Mantine UI (kept as-is), so component styling largely carries over.
   than porting spatie/permission's granular per-action permission tables —
   Phase 1 only needs role-based middleware; revisit only if a later phase
   needs finer-grained permissions than "which role am I."
+- Google Sign-In (decided 2026-09-03, Phase 1): Google Identity Services
+  (GIS) button flow — frontend gets an ID token straight from Google's JS
+  SDK, POSTs it to `/api/v1/auth/google`, backend verifies it with
+  `google.golang.org/api/idtoken` (Client ID only, no client secret, no
+  server-side redirect). Behavior deliberately matches the reference
+  Laravel app exactly: Google login only authenticates an *existing* user
+  (matched by `google_id`, falling back to `email` and backfilling
+  `google_id`) — an unrecognized Google email is a hard failure, not an
+  auto-registration. The reference app's OTP/`email_verified_at` activation
+  flow is unrelated to Google login there (it only fires for admin-created
+  accounts) and belongs with the Phase 2 Users module, not here.
+- CORS: `gin-contrib/cors`, origin allow-list from `FRONTEND_ORIGIN` env
+  (default `http://localhost:5173`), `AllowCredentials: true` — required
+  because the refresh-token cookie flow is a credentialed cross-origin
+  request from the Vite dev server to the Go API.
 
 ## Known correctness bug to fix, not carry over
 
@@ -90,13 +105,15 @@ changes.
 
 **What actually rejects off-spec/broken changes automatically (GitHub-side,
 not Claude-side):**
-- `main` is branch-protected (enabled 2026-09-03): PRs required with 1
-  approval (self-approval counts, stale approvals dismissed on new pushes),
-  force-push and branch deletion blocked, and PRs cannot merge unless the
+- `main` is branch-protected (enabled 2026-09-03): PRs required, force-push
+  and branch deletion blocked, and PRs cannot merge unless the
   `backend-ci.yml` `build-test` job (go vet/build/test, plus golangci-lint
-  once added) is green. `enforce_admins` is left `false`, so the repo owner
-  can still push directly to `main` in an emergency — that's a deliberate
-  escape hatch, not a gap to close casually.
+  once added) is green. Required approving reviews is set to **0**, not 1 —
+  GitHub does not allow approving your own PR, so on this solo repo a
+  required-approval count of 1 would be permanently unmeetable;  PR-required
+  + green CI is still enforced. `enforce_admins` is left `false`, so the repo
+  owner can still push directly to `main` in an emergency — that's a
+  deliberate escape hatch, not a gap to close casually.
 - Every phase issue (#2-#8 and beyond) carries acceptance criteria in its
   body — a PR should reference the issue (`closes #N`) and its description
   should map to those criteria, so review (`/code-review` or manual) has a

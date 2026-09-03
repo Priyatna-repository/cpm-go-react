@@ -1,0 +1,17 @@
+# Backend (Go)
+backend/.env
+backend/tmp/
+backend/*.exe
+backend/cpm-api
+
+# Frontend (Node)
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+
+# OS / editor
+.DS_Store
+*.log
+.idea/
+.vscode/

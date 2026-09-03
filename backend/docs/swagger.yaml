@@ -1,0 +1,29 @@
+basePath: /
+definitions:
+  handlers.HealthResponse:
+    properties:
+      status:
+        example: ok
+        type: string
+    type: object
+info:
+  contact: {}
+  description: Backend API for the Construction Project Manager application.
+  title: CPM API
+  version: "0.1"
+paths:
+  /health:
+    get:
+      description: Returns service status, used for uptime checks and CI/CD deploy
+        verification
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.HealthResponse'
+      summary: Health check
+      tags:
+      - system
+swagger: "2.0"

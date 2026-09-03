@@ -26,6 +26,9 @@ type Config struct {
 	AdminName     string
 	AdminEmail    string
 	AdminPassword string
+
+	GoogleClientID string
+	FrontendOrigin string
 }
 
 func Load() *Config {
@@ -50,6 +53,9 @@ func Load() *Config {
 		AdminName:     getEnv("ADMIN_NAME", "Admin"),
 		AdminEmail:    getEnv("ADMIN_EMAIL", ""),
 		AdminPassword: getEnv("ADMIN_PASSWORD", ""),
+
+		GoogleClientID: getEnv("GOOGLE_CLIENT_ID", ""),
+		FrontendOrigin: getEnv("FRONTEND_ORIGIN", "http://localhost:5173"),
 	}
 
 	if len(cfg.JWTSecret) < 32 {

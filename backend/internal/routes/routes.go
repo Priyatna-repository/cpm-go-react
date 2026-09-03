@@ -1,10 +1,13 @@
 package routes
 
 import (
+	"time"
+
 	"github.com/Priyatna-repository/cpm-go-react/backend/internal/config"
 	"github.com/Priyatna-repository/cpm-go-react/backend/internal/handlers"
 	"github.com/Priyatna-repository/cpm-go-react/backend/internal/middleware"
 	"github.com/Priyatna-repository/cpm-go-react/backend/internal/services"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -14,6 +17,14 @@ import (
 )
 
 func Setup(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{cfg.FrontendOrigin},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
+
 	r.GET("/health", handlers.HealthCheck)
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -26,6 +37,7 @@ func Setup(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 		auth := api.Group("/auth")
 		{
 			auth.POST("/login", authHandler.Login)
+			auth.POST("/google", authHandler.GoogleLogin)
 			auth.POST("/refresh", authHandler.Refresh)
 			auth.POST("/logout", authHandler.Logout)
 		}

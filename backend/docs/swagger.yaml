@@ -1,5 +1,12 @@
 basePath: /
 definitions:
+  handlers.GoogleLoginRequest:
+    properties:
+      credential:
+        type: string
+    required:
+    - credential
+    type: object
   handlers.HealthResponse:
     properties:
       status:
@@ -52,6 +59,53 @@ info:
   title: CPM API
   version: "0.1"
 paths:
+  /api/v1/auth/google:
+    post:
+      consumes:
+      - application/json
+      description: Verifies a Google Identity Services ID token and logs in an existing
+        user (matched by google_id or email). Does not create new accounts.
+      parameters:
+      - description: Google ID token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.GoogleLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Log in with Google
+      tags:
+      - auth
   /api/v1/auth/login:
     post:
       consumes:

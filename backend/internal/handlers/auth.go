@@ -70,6 +70,47 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	c.JSON(http.StatusOK, toLoginResponse(user, pair))
 }
 
+type GoogleLoginRequest struct {
+	Credential string `json:"credential" binding:"required"`
+}
+
+// GoogleLogin godoc
+// @Summary      Log in with Google
+// @Description  Verifies a Google Identity Services ID token and logs in an existing user (matched by google_id or email). Does not create new accounts.
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        request  body      GoogleLoginRequest  true  "Google ID token"
+// @Success      200      {object}  LoginResponse
+// @Failure      400      {object}  map[string]string
+// @Failure      401      {object}  map[string]string
+// @Failure      404      {object}  map[string]string
+// @Failure      503      {object}  map[string]string
+// @Router       /api/v1/auth/google [post]
+func (h *AuthHandler) GoogleLogin(c *gin.Context) {
+	var req GoogleLoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	user, pair, err := h.auth.GoogleLogin(c.Request.Context(), req.Credential)
+	if err != nil {
+		switch {
+		case errors.Is(err, services.ErrGoogleUserNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "no user was found with your Google email address"})
+		case errors.Is(err, services.ErrGoogleNotConfigured):
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Google sign-in is not configured"})
+		default:
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid Google sign-in"})
+		}
+		return
+	}
+
+	h.setRefreshCookie(c, pair.RefreshToken, pair.RefreshExpiresAt)
+	c.JSON(http.StatusOK, toLoginResponse(user, pair))
+}
+
 // Refresh godoc
 // @Summary      Refresh access token
 // @Description  Rotates the refresh-token cookie and returns a new access token.

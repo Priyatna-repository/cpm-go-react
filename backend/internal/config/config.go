@@ -3,6 +3,8 @@ package config
 import (
 	"log"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -16,6 +18,14 @@ type Config struct {
 	DBPassword string
 	DBName     string
 	DBSSLMode  string
+
+	JWTSecret       string
+	AccessTokenTTL  time.Duration
+	RefreshTokenTTL time.Duration
+
+	AdminName     string
+	AdminEmail    string
+	AdminPassword string
 }
 
 func Load() *Config {
@@ -32,6 +42,14 @@ func Load() *Config {
 		DBPassword: getEnv("DB_PASSWORD", "postgres"),
 		DBName:     getEnv("DB_NAME", "cpm"),
 		DBSSLMode:  getEnv("DB_SSLMODE", "disable"),
+
+		JWTSecret:       getEnv("JWT_SECRET", ""),
+		AccessTokenTTL:  getEnvMinutes("JWT_ACCESS_TTL_MINUTES", 15),
+		RefreshTokenTTL: getEnvHours("JWT_REFRESH_TTL_HOURS", 24*7),
+
+		AdminName:     getEnv("ADMIN_NAME", "Admin"),
+		AdminEmail:    getEnv("ADMIN_EMAIL", ""),
+		AdminPassword: getEnv("ADMIN_PASSWORD", ""),
 	}
 }
 
@@ -40,4 +58,25 @@ func getEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func getEnvMinutes(key string, fallback int) time.Duration {
+	return time.Duration(getEnvInt(key, fallback)) * time.Minute
+}
+
+func getEnvHours(key string, fallback int) time.Duration {
+	return time.Duration(getEnvInt(key, fallback)) * time.Hour
+}
+
+func getEnvInt(key string, fallback int) int {
+	value, ok := os.LookupEnv(key)
+	if !ok {
+		return fallback
+	}
+	n, err := strconv.Atoi(value)
+	if err != nil {
+		log.Printf("invalid %s=%q, using default %d", key, value, fallback)
+		return fallback
+	}
+	return n
 }

@@ -4,6 +4,9 @@
 // @version         0.1
 // @description     Backend API for the Construction Project Manager application.
 // @BasePath        /
+// @securityDefinitions.apikey  BearerAuth
+// @in                          header
+// @name                        Authorization
 package main
 
 import (
@@ -29,12 +32,16 @@ func main() {
 	}
 	defer sqlDB.Close()
 
+	if err := database.Migrate(db, cfg); err != nil {
+		log.Fatalf("database migration failed: %v", err)
+	}
+
 	if cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
 	r := gin.Default()
-	routes.Setup(r)
+	routes.Setup(r, db, cfg)
 
 	log.Printf("starting server on :%s (env=%s)", cfg.AppPort, cfg.AppEnv)
 	if err := r.Run(":" + cfg.AppPort); err != nil {

@@ -1,0 +1,168 @@
+package services
+
+import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
+	"errors"
+	"strconv"
+	"time"
+
+	"github.com/Priyatna-repository/cpm-go-react/backend/internal/config"
+	"github.com/Priyatna-repository/cpm-go-react/backend/internal/models"
+	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
+)
+
+var (
+	ErrInvalidCredentials  = errors.New("invalid email or password")
+	ErrInvalidRefreshToken = errors.New("invalid or expired refresh token")
+)
+
+// dummyHash lets Login run a bcrypt compare even when the email doesn't
+// exist, so a wrong-email response doesn't return measurably faster than a
+// wrong-password one.
+var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("cpm-timing-mitigation"), bcrypt.DefaultCost)
+
+type AuthService struct {
+	db  *gorm.DB
+	cfg *config.Config
+}
+
+func NewAuthService(db *gorm.DB, cfg *config.Config) *AuthService {
+	return &AuthService{db: db, cfg: cfg}
+}
+
+type Claims struct {
+	UserID uint   `json:"uid"`
+	Role   string `json:"role"`
+	jwt.RegisteredClaims
+}
+
+type TokenPair struct {
+	AccessToken      string
+	AccessExpiresIn  int
+	RefreshToken     string
+	RefreshExpiresAt time.Time
+}
+
+func (s *AuthService) Login(email, password string) (*models.User, *TokenPair, error) {
+	var user models.User
+	if err := s.db.Preload("Role").Where("email = ?", email).First(&user).Error; err != nil {
+		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
+		return nil, nil, ErrInvalidCredentials
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+		return nil, nil, ErrInvalidCredentials
+	}
+
+	pair, err := s.issueTokenPair(&user)
+	if err != nil {
+		return nil, nil, err
+	}
+	return &user, pair, nil
+}
+
+func (s *AuthService) Refresh(rawToken string) (*models.User, *TokenPair, error) {
+	hash := hashToken(rawToken)
+
+	var stored models.RefreshToken
+	if err := s.db.Where("token_hash = ?", hash).First(&stored).Error; err != nil {
+		return nil, nil, ErrInvalidRefreshToken
+	}
+	if stored.RevokedAt != nil || time.Now().After(stored.ExpiresAt) {
+		return nil, nil, ErrInvalidRefreshToken
+	}
+
+	var user models.User
+	if err := s.db.Preload("Role").First(&user, stored.UserID).Error; err != nil {
+		return nil, nil, ErrInvalidRefreshToken
+	}
+
+	if err := s.db.Model(&stored).Update("revoked_at", time.Now()).Error; err != nil {
+		return nil, nil, err
+	}
+
+	pair, err := s.issueTokenPair(&user)
+	if err != nil {
+		return nil, nil, err
+	}
+	return &user, pair, nil
+}
+
+func (s *AuthService) Logout(rawToken string) error {
+	hash := hashToken(rawToken)
+	return s.db.Model(&models.RefreshToken{}).
+		Where("token_hash = ? AND revoked_at IS NULL", hash).
+		Update("revoked_at", time.Now()).Error
+}
+
+func (s *AuthService) ParseAccessToken(raw string) (*Claims, error) {
+	claims := &Claims{}
+	token, err := jwt.ParseWithClaims(raw, claims, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("unexpected signing method")
+		}
+		return []byte(s.cfg.JWTSecret), nil
+	})
+	if err != nil || !token.Valid {
+		return nil, errors.New("invalid access token")
+	}
+	return claims, nil
+}
+
+func (s *AuthService) issueTokenPair(user *models.User) (*TokenPair, error) {
+	now := time.Now()
+	accessExp := now.Add(s.cfg.AccessTokenTTL)
+
+	claims := Claims{
+		UserID: user.ID,
+		Role:   user.Role.Name,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(accessExp),
+			IssuedAt:  jwt.NewNumericDate(now),
+			Subject:   strconv.FormatUint(uint64(user.ID), 10),
+		},
+	}
+	access, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(s.cfg.JWTSecret))
+	if err != nil {
+		return nil, err
+	}
+
+	rawRefresh, err := randomToken()
+	if err != nil {
+		return nil, err
+	}
+	refreshExp := now.Add(s.cfg.RefreshTokenTTL)
+
+	if err := s.db.Create(&models.RefreshToken{
+		UserID:    user.ID,
+		TokenHash: hashToken(rawRefresh),
+		ExpiresAt: refreshExp,
+	}).Error; err != nil {
+		return nil, err
+	}
+
+	return &TokenPair{
+		AccessToken:      access,
+		AccessExpiresIn:  int(s.cfg.AccessTokenTTL.Seconds()),
+		RefreshToken:     rawRefresh,
+		RefreshExpiresAt: refreshExp,
+	}, nil
+}
+
+func randomToken() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+func hashToken(raw string) string {
+	sum := sha256.Sum256([]byte(raw))
+	return hex.EncodeToString(sum[:])
+}

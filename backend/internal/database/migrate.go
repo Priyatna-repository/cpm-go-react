@@ -14,7 +14,7 @@ import (
 // permission catalog, and a bootstrap admin user (from ADMIN_* env vars) if
 // one doesn't exist yet.
 func Migrate(db *gorm.DB, cfg *config.Config) error {
-	if err := db.AutoMigrate(&models.Role{}, &models.Permission{}, &models.User{}, &models.RefreshToken{}); err != nil {
+	if err := db.AutoMigrate(&models.Role{}, &models.Permission{}, &models.User{}, &models.RefreshToken{}, &models.Country{}, &models.Currency{}, &models.OwnerCompany{}, &models.ClientCompany{}); err != nil {
 		return err
 	}
 
@@ -23,6 +23,14 @@ func Migrate(db *gorm.DB, cfg *config.Config) error {
 	}
 
 	if err := seedPermissions(db); err != nil {
+		return err
+	}
+
+	if err := seedLookups(db); err != nil {
+		return err
+	}
+
+	if err := seedOwnerCompany(db); err != nil {
 		return err
 	}
 
@@ -70,6 +78,62 @@ var permissionCatalog = []defaultPermission{
 		name:        "roles.manage",
 		category:    "Roles & Permissions",
 		description: "Change which permissions are assigned to a role",
+		roles:       []string{},
+	},
+	// Only admin gets owner_company.* by default (matches the reference
+	// app — manager has no "Owner Company" permissions there either).
+	// Deliberate, not an oversight; grant manager access via the Roles &
+	// Permissions UI if that's ever actually needed.
+	{
+		name:        "owner_company.view",
+		category:    "Owner Company",
+		description: "View the owner company profile",
+		roles:       []string{},
+	},
+	{
+		name:        "owner_company.edit",
+		category:    "Owner Company",
+		description: "Edit the owner company profile",
+		roles:       []string{},
+	},
+	{
+		name:        "client_company.view",
+		category:    "Client Companies",
+		description: "View client companies",
+		roles:       []string{models.RoleManager},
+	},
+	{
+		name:        "client_company.create",
+		category:    "Client Companies",
+		description: "Create client companies",
+		roles:       []string{models.RoleManager},
+	},
+	// Manager deliberately gets create/archive/restore but NOT edit here —
+	// matches the reference app's actual default permission set exactly
+	// (its "manager" role never had "edit client company" either). Not a
+	// gap; grant it via the Roles & Permissions UI if needed.
+	{
+		name:        "client_company.edit",
+		category:    "Client Companies",
+		description: "Edit client companies",
+		roles:       []string{},
+	},
+	{
+		name:        "client_company.archive",
+		category:    "Client Companies",
+		description: "Archive client companies",
+		roles:       []string{models.RoleManager},
+	},
+	{
+		name:        "client_company.restore",
+		category:    "Client Companies",
+		description: "Restore archived client companies",
+		roles:       []string{models.RoleManager},
+	},
+	{
+		name:        "client_company.delete",
+		category:    "Client Companies",
+		description: "Permanently delete client companies",
 		roles:       []string{},
 	},
 }
@@ -145,4 +209,15 @@ func seedAdmin(db *gorm.DB, cfg *config.Config) error {
 
 	log.Printf("bootstrap admin user created: %s", cfg.AdminEmail)
 	return nil
+}
+
+func seedOwnerCompany(db *gorm.DB) error {
+	var count int64
+	if err := db.Model(&models.OwnerCompany{}).Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	return db.Create(&models.OwnerCompany{Name: "My Company"}).Error
 }

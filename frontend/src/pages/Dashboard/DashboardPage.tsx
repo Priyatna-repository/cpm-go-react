@@ -16,6 +16,17 @@ export function DashboardPage() {
           Manage Roles & Permissions
         </Button>
       )}
+      {can('owner_company.view') && (
+        <Button component={Link} to="/settings/company" w={240} variant="light">
+          Company Profile
+        </Button>
+      )}
+      {can('client_company.view') && (
+        <Button component={Link} to="/clients/companies" w={240} variant="light">
+          Client Companies
+        </Button>
+      )}
+
       <Button w={160} onClick={() => logout()}>
         Log out
       </Button>

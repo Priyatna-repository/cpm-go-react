@@ -1,6 +1,7 @@
 package database
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/Priyatna-repository/cpm-go-react/backend/internal/config"
@@ -42,6 +43,11 @@ func seedRoles(db *gorm.DB) error {
 // permission is created — if it already exists, we leave its role
 // assignments alone, since an admin may have already customized them via
 // the management UI.
+//
+// Admin is deliberately never listed in `roles`: it always bypasses
+// permission checks (models.IsAdmin), is excluded from the management UI,
+// and can't be edited via UpdateRolePermissions — seeding it a row here
+// would just be dead data nothing ever reads.
 type defaultPermission struct {
 	name        string
 	category    string
@@ -58,17 +64,26 @@ var permissionCatalog = []defaultPermission{
 		name:        "roles.view",
 		category:    "Roles & Permissions",
 		description: "View roles and their assigned permissions",
-		roles:       []string{models.RoleAdmin, models.RoleManager},
+		roles:       []string{models.RoleManager},
 	},
 	{
 		name:        "roles.manage",
 		category:    "Roles & Permissions",
 		description: "Change which permissions are assigned to a role",
-		roles:       []string{models.RoleAdmin},
+		roles:       []string{},
 	},
 }
 
 func seedPermissions(db *gorm.DB) error {
+	var allRoles []models.Role
+	if err := db.Find(&allRoles).Error; err != nil {
+		return err
+	}
+	roleByName := make(map[string]models.Role, len(allRoles))
+	for _, r := range allRoles {
+		roleByName[r.Name] = r
+	}
+
 	for _, d := range permissionCatalog {
 		var perm models.Permission
 		result := db.Where(models.Permission{Name: d.name}).
@@ -82,9 +97,9 @@ func seedPermissions(db *gorm.DB) error {
 		}
 
 		for _, roleName := range d.roles {
-			var role models.Role
-			if err := db.Where("name = ?", roleName).First(&role).Error; err != nil {
-				return err
+			role, ok := roleByName[roleName]
+			if !ok {
+				return fmt.Errorf("seedPermissions: role %q not found", roleName)
 			}
 			if err := db.Model(&role).Association("Permissions").Append(&perm); err != nil {
 				return err

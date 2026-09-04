@@ -1,5 +1,86 @@
 basePath: /
 definitions:
+  handlers.ClientCompanyListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handlers.ClientCompanyResponse'
+        type: array
+      meta:
+        properties:
+          current_page:
+            type: integer
+          last_page:
+            type: integer
+          total:
+            type: integer
+        type: object
+    type: object
+  handlers.ClientCompanyResponse:
+    properties:
+      address:
+        type: string
+      archived_at:
+        type: string
+      city:
+        type: string
+      clients:
+        items:
+          $ref: '#/definitions/handlers.ClientUserResponse'
+        type: array
+      country_id:
+        type: integer
+      currency_id:
+        type: integer
+      email:
+        type: string
+      id:
+        type: integer
+      logo:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+      postal_code:
+        type: string
+      web:
+        type: string
+    type: object
+  handlers.ClientUserResponse:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  handlers.CountryResponse:
+    properties:
+      id:
+        example: 1
+        type: integer
+      name:
+        example: Indonesia
+        type: string
+    type: object
+  handlers.CurrencyResponse:
+    properties:
+      code:
+        example: IDR
+        type: string
+      decimals:
+        example: 2
+        type: integer
+      id:
+        example: 1
+        type: integer
+      name:
+        example: Rupiah
+        type: string
+      symbol:
+        example: Rp
+        type: string
+    type: object
   handlers.GoogleLoginRequest:
     properties:
       credential:
@@ -37,6 +118,31 @@ definitions:
         type: string
       user:
         $ref: '#/definitions/handlers.UserResponse'
+    type: object
+  handlers.OwnerCompanyResponse:
+    properties:
+      address:
+        type: string
+      city:
+        type: string
+      country_id:
+        type: integer
+      currency_id:
+        type: integer
+      email:
+        type: string
+      id:
+        type: integer
+      logo:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+      postal_code:
+        type: string
+      web:
+        type: string
     type: object
   handlers.PermissionResponse:
     properties:
@@ -78,7 +184,6 @@ definitions:
       version:
         type: integer
     required:
-    - permissions
     - version
     type: object
   handlers.UserResponse:
@@ -216,6 +321,322 @@ paths:
       summary: Refresh access token
       tags:
       - auth
+  /api/v1/client-companies:
+    get:
+      description: Paginated, searchable. Requires client_company.view.
+      parameters:
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Search by name or email
+        in: query
+        name: search
+        type: string
+      - description: Show archived instead of active
+        in: query
+        name: archived
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ClientCompanyListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List client companies
+      tags:
+      - client-companies
+    post:
+      consumes:
+      - multipart/form-data
+      description: multipart/form-data body (logo file is optional). Requires client_company.create.
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.ClientCompanyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a client company
+      tags:
+      - client-companies
+  /api/v1/client-companies/{id}:
+    delete:
+      parameters:
+      - description: Client company ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Archive a client company
+      tags:
+      - client-companies
+    get:
+      parameters:
+      - description: Client company ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ClientCompanyResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get a client company
+      tags:
+      - client-companies
+    put:
+      consumes:
+      - multipart/form-data
+      description: multipart/form-data body (logo file is optional). Requires client_company.edit.
+      parameters:
+      - description: Client company ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ClientCompanyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update a client company
+      tags:
+      - client-companies
+  /api/v1/client-companies/{id}/force:
+    delete:
+      parameters:
+      - description: Client company ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Permanently delete a client company
+      tags:
+      - client-companies
+  /api/v1/client-companies/{id}/restore:
+    post:
+      parameters:
+      - description: Client company ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Restore an archived client company
+      tags:
+      - client-companies
+  /api/v1/lookups/client-users:
+    get:
+      description: For the "assign clients" picker on the ClientCompany form.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.ClientUserResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List users with the client role
+      tags:
+      - client-companies
+  /api/v1/lookups/countries:
+    get:
+      description: Static reference data, for populating dropdowns.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.CountryResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List countries
+      tags:
+      - lookups
+  /api/v1/lookups/currencies:
+    get:
+      description: Static reference data, for populating dropdowns.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.CurrencyResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List currencies
+      tags:
+      - lookups
   /api/v1/me:
     get:
       description: Returns the authenticated user's profile.
@@ -237,6 +658,67 @@ paths:
       summary: Current user
       tags:
       - auth
+  /api/v1/owner-company:
+    get:
+      description: Returns the single owner company record. Requires owner_company.view.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.OwnerCompanyResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get owner company
+      tags:
+      - owner-company
+    put:
+      consumes:
+      - multipart/form-data
+      description: multipart/form-data body (logo file is optional). Requires owner_company.edit.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.OwnerCompanyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update owner company
+      tags:
+      - owner-company
   /api/v1/permissions:
     get:
       description: Returns every permission in the catalog. Requires the roles.view

@@ -29,6 +29,7 @@ type Config struct {
 
 	GoogleClientID string
 	FrontendOrigin string
+	UploadDir      string
 }
 
 func Load() *Config {
@@ -56,6 +57,7 @@ func Load() *Config {
 
 		GoogleClientID: getEnv("GOOGLE_CLIENT_ID", ""),
 		FrontendOrigin: getEnv("FRONTEND_ORIGIN", "http://localhost:5173"),
+		UploadDir:      getEnv("UPLOAD_DIR", "uploads"),
 	}
 
 	if len(cfg.JWTSecret) < 32 {

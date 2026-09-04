@@ -32,6 +32,9 @@ func Setup(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 	authService := services.NewAuthService(db, cfg)
 	authHandler := handlers.NewAuthHandler(authService, cfg)
 
+	permService := services.NewPermissionService(db)
+	permHandler := handlers.NewPermissionHandler(permService)
+
 	api := r.Group("/api/v1")
 	{
 		auth := api.Group("/auth")
@@ -43,5 +46,19 @@ func Setup(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 		}
 
 		api.GET("/me", middleware.RequireAuth(authService), authHandler.Me)
+
+		api.GET(
+			"/permissions",
+			middleware.RequireAuth(authService),
+			middleware.RequirePermission(permService, "roles.view"),
+			permHandler.ListPermissions,
+		)
+
+		roles := api.Group("/roles")
+		roles.Use(middleware.RequireAuth(authService))
+		{
+			roles.GET("", middleware.RequirePermission(permService, "roles.view"), permHandler.ListRoles)
+			roles.PUT("/:id/permissions", middleware.RequirePermission(permService, "roles.manage"), permHandler.UpdateRolePermissions)
+		}
 	}
 }

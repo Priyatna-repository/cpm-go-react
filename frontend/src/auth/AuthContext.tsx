@@ -6,6 +6,7 @@ import type { AuthUser } from '../api/auth';
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
+  can: (permission: string) => boolean;
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: (credential: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -50,8 +51,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }
 
+  function can(permission: string): boolean {
+    if (!user) return false;
+    if (user.role === 'admin') return true;
+    return user.permissions.includes(permission);
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, loginWithGoogle, logout }}>
+    <AuthContext.Provider value={{ user, loading, can, login, loginWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   );

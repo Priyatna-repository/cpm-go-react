@@ -35,26 +35,3 @@ func RequireAuth(auth *services.AuthService) gin.HandlerFunc {
 		c.Next()
 	}
 }
-
-// RequireRole must run after RequireAuth. It aborts with 403 unless the
-// caller's role is one of the allowed roles.
-func RequireRole(roles ...string) gin.HandlerFunc {
-	allowed := make(map[string]struct{}, len(roles))
-	for _, r := range roles {
-		allowed[r] = struct{}{}
-	}
-
-	return func(c *gin.Context) {
-		value, exists := c.Get(ContextRole)
-		role, ok := value.(string)
-		if !exists || !ok {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing authentication context"})
-			return
-		}
-		if _, ok := allowed[role]; !ok {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "insufficient role"})
-			return
-		}
-		c.Next()
-	}
-}

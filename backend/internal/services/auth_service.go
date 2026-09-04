@@ -55,7 +55,7 @@ type TokenPair struct {
 
 func (s *AuthService) Login(email, password string) (*models.User, *TokenPair, error) {
 	var user models.User
-	if err := s.db.Preload("Role").Where("LOWER(email) = LOWER(?)", email).First(&user).Error; err != nil {
+	if err := s.db.Preload("Role.Permissions").Where("LOWER(email) = LOWER(?)", email).First(&user).Error; err != nil {
 		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
 		return nil, nil, ErrInvalidCredentials
 	}
@@ -91,7 +91,7 @@ func (s *AuthService) Refresh(rawToken string) (*models.User, *TokenPair, error)
 	}
 
 	var user models.User
-	if err := s.db.Preload("Role").First(&user, stored.UserID).Error; err != nil {
+	if err := s.db.Preload("Role.Permissions").First(&user, stored.UserID).Error; err != nil {
 		return nil, nil, ErrInvalidRefreshToken
 	}
 
@@ -130,7 +130,7 @@ func (s *AuthService) GoogleLogin(ctx context.Context, idTokenStr string) (*mode
 		if !emailVerified {
 			return nil, nil, ErrGoogleUserNotFound
 		}
-		if err := s.db.Preload("Role").Where("LOWER(email) = LOWER(?)", email).First(&user).Error; err != nil {
+		if err := s.db.Preload("Role.Permissions").Where("LOWER(email) = LOWER(?)", email).First(&user).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return nil, nil, ErrGoogleUserNotFound
 			}
@@ -159,7 +159,7 @@ func (s *AuthService) Logout(rawToken string) error {
 
 func (s *AuthService) GetUserByID(id uint) (*models.User, error) {
 	var user models.User
-	if err := s.db.First(&user, id).Error; err != nil {
+	if err := s.db.Preload("Role.Permissions").First(&user, id).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil

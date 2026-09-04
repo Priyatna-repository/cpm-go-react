@@ -1,6 +1,6 @@
 import { useCallback, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { errorMessage } from '../../utils/errors';
 import {
   Alert,
   Button,
@@ -27,12 +27,6 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function errorMessage(err: unknown, fallback: string): string {
-    if (axios.isAxiosError(err) && typeof err.response?.data?.error === 'string') {
-      return err.response.data.error;
-    }
-    return fallback;
-  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -85,6 +79,9 @@ export function LoginPage() {
 
         <form onSubmit={handleSubmit}>
           <TextInput
+            type="email"
+            name="email"
+            autoComplete="email"
             label="Email"
             placeholder="Your email"
             required
@@ -96,6 +93,8 @@ export function LoginPage() {
             mt="md"
           />
           <PasswordInput
+            name="password"
+            autoComplete="current-password"
             label="Password"
             placeholder="Your password"
             required

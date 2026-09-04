@@ -29,10 +29,11 @@ type LoginRequest struct {
 }
 
 type UserResponse struct {
-	ID    uint   `json:"id" example:"1"`
-	Name  string `json:"name" example:"Admin User"`
-	Email string `json:"email" example:"admin@example.com"`
-	Role  string `json:"role" example:"admin"`
+	ID          uint     `json:"id" example:"1"`
+	Name        string   `json:"name" example:"Admin User"`
+	Email       string   `json:"email" example:"admin@example.com"`
+	Role        string   `json:"role" example:"admin"`
+	Permissions []string `json:"permissions"`
 }
 
 type LoginResponse struct {
@@ -56,7 +57,7 @@ type LoginResponse struct {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "email and password are required"})
 		return
 	}
 
@@ -90,7 +91,7 @@ type GoogleLoginRequest struct {
 func (h *AuthHandler) GoogleLogin(c *gin.Context) {
 	var req GoogleLoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "credential is required"})
 		return
 	}
 
@@ -164,18 +165,17 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 // @Router       /api/v1/me [get]
 func (h *AuthHandler) Me(c *gin.Context) {
 	userIDVal, _ := c.Get(middleware.ContextUserID)
-	roleVal, _ := c.Get(middleware.ContextRole)
-
 	id, _ := userIDVal.(uint)
-	role, _ := roleVal.(string)
 
 	user, err := h.auth.GetUserByID(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 		return
 	}
-
-	c.JSON(http.StatusOK, UserResponse{ID: user.ID, Name: user.Name, Email: user.Email, Role: role})
+	c.JSON(http.StatusOK, UserResponse{
+		ID: user.ID, Name: user.Name, Email: user.Email, Role: user.Role.Name,
+		Permissions: services.PermissionNames(user.Role.Permissions),
+	})
 }
 
 func toLoginResponse(user *models.User, pair *services.TokenPair) LoginResponse {
@@ -184,10 +184,11 @@ func toLoginResponse(user *models.User, pair *services.TokenPair) LoginResponse 
 		TokenType:   "Bearer",
 		ExpiresIn:   pair.AccessExpiresIn,
 		User: UserResponse{
-			ID:    user.ID,
-			Name:  user.Name,
-			Email: user.Email,
-			Role:  user.Role.Name,
+			ID:          user.ID,
+			Name:        user.Name,
+			Email:       user.Email,
+			Role:        user.Role.Name,
+			Permissions: services.PermissionNames(user.Role.Permissions),
 		},
 	}
 }

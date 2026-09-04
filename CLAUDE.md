@@ -40,6 +40,28 @@ Mantine UI (kept as-is), so component styling largely carries over.
   than porting spatie/permission's granular per-action permission tables —
   Phase 1 only needs role-based middleware; revisit only if a later phase
   needs finer-grained permissions than "which role am I."
+- Permission management (decided 2026-09-03, tracked in issue #12, ships
+  before Phase 2's CRUD modules): revisits the bullet above — granular,
+  role-based permissions (e.g. `project.create`, `task.delete`) are global
+  per role, matching the reference app's spatie/permission usage (not
+  per-project/per-user overrides — out of scope unless a later phase proves
+  that's actually needed). `permissions` + `role_permissions` tables;
+  `RequirePermission(permission string)` middleware queries the DB on every
+  request rather than embedding permissions in the JWT, so an admin's
+  permission-assignment change via the management UI takes effect
+  immediately instead of waiting for the next access-token refresh. Admin
+  always bypasses `RequirePermission` (`models.IsAdmin`), regardless of what
+  `role_permissions` actually has seeded for it — a deliberate fix for a
+  real bug in the reference Laravel app, where admin could get 403'd on a
+  permission nobody remembered to seed (Gate::before admin-bypass exists in
+  that codebase but is commented out and inactive). Because of this bypass,
+  admin is intentionally never seeded into `role_permissions` and is
+  excluded from the role-management UI/API — those rows would be dead data.
+  The actual permission catalog is populated incrementally as each Phase 2+
+  domain module ships (a `project.*` permission can't exist before the
+  `Project` resource does) — issue #12 only ships the infrastructure, the
+  admin management UI, and a couple of example permissions to prove it
+  works end-to-end.
 - Google Sign-In (decided 2026-09-03, Phase 1): Google Identity Services
   (GIS) button flow — frontend gets an ID token straight from Google's JS
   SDK, POSTs it to `/api/v1/auth/google`, backend verifies it with

@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import {
-  Alert, Avatar, Box, Button, Group, Paper, Select, Stack, TextInput, Title,
+    Alert, Button, Group, Paper, Select, Stack, TextInput, Title,
 } from '@mantine/core';
+import { LogoUpload } from '../../components/LogoUpload';
 import { IconAlertTriangle } from '@tabler/icons-react';
 import * as ownerCompanyApi from '../../api/ownerCompany';
 import type { OwnerCompany } from '../../api/ownerCompany';
@@ -9,6 +10,7 @@ import * as lookupsApi from '../../api/lookups';
 import type { Country, Currency } from '../../api/lookups';
 import { useAuth } from '../../auth/AuthContext';
 import { errorMessage } from '../../utils/errors';
+
 
 export function CompanyPage() {
   const { can } = useAuth();
@@ -23,8 +25,6 @@ export function CompanyPage() {
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [logoUrl, setLogoUrl] = useState<string | undefined>(undefined);
   const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
@@ -68,16 +68,6 @@ export function CompanyPage() {
     })();
   }, []);
 
-  function handleLogoChange(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setLogoPreview((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return URL.createObjectURL(file);
-    });
-    setLogoFile(file);
-  }
-
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -98,7 +88,6 @@ export function CompanyPage() {
       });
       applyCompany(updated);
       setLogoFile(null);
-      setLogoPreview(null);
       setSaved(true);
     } catch (err) {
       setError(errorMessage(err, 'Failed to save changes.'));
@@ -125,26 +114,12 @@ export function CompanyPage() {
       <Paper radius="md" p="lg" withBorder>
         <form onSubmit={handleSubmit}>
           <Group align="flex-start">
-            <Box>
-              <Avatar
-                src={logoPreview ?? logoUrl}
-                size={100}
-                radius="md"
-                style={{ cursor: canEdit ? 'pointer' : 'default' }}
-                onClick={() => canEdit && fileInputRef.current?.click()}
-              >
-                {name.slice(0, 1)}
-              </Avatar>
-              {canEdit && (
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/gif"
-                  hidden
-                  onChange={handleLogoChange}
-                />
-              )}
-            </Box>
+            <LogoUpload
+              currentUrl={logoUrl}
+              fallbackText={name}
+              disabled={!canEdit}
+              onChange={setLogoFile}
+            />
             <Stack gap="xs" style={{ flex: 1 }}>
               <TextInput
                 label="Name"

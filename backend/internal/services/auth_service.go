@@ -64,6 +64,10 @@ func (s *AuthService) Login(email, password string) (*models.User, *TokenPair, e
 		return nil, nil, ErrInvalidCredentials
 	}
 
+	if user.ArchivedAt != nil {
+		return nil, nil, ErrInvalidCredentials
+	}
+
 	pair, err := s.issueTokenPair(&user)
 	if err != nil {
 		return nil, nil, err
@@ -92,6 +96,10 @@ func (s *AuthService) Refresh(rawToken string) (*models.User, *TokenPair, error)
 
 	var user models.User
 	if err := s.db.Preload("Role.Permissions").First(&user, stored.UserID).Error; err != nil {
+		return nil, nil, ErrInvalidRefreshToken
+	}
+
+	if user.ArchivedAt != nil {
 		return nil, nil, ErrInvalidRefreshToken
 	}
 
@@ -141,6 +149,10 @@ func (s *AuthService) GoogleLogin(ctx context.Context, idTokenStr string) (*mode
 		}
 	case err != nil:
 		return nil, nil, err
+	}
+
+	if user.ArchivedAt != nil {
+		return nil, nil, ErrGoogleUserNotFound
 	}
 
 	pair, err := s.issueTokenPair(&user)

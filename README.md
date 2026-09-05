@@ -65,3 +65,9 @@ the task-metrics updater and the EVM service read it with `max('progress')`,
 which assumes cumulative values. This under-counts earned value whenever a
 task has more than one report. The Go port must store/derive **cumulative**
 progress per task as of a given date, not `max()` over incremental values.
+
+# Testing x account
+Role	Email	Password
+Manager	manager.test@example.com	manager123
+Team Member	teammember.test@example.com	teammember123
+

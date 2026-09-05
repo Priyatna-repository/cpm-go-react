@@ -14,7 +14,7 @@ import (
 // permission catalog, and a bootstrap admin user (from ADMIN_* env vars) if
 // one doesn't exist yet.
 func Migrate(db *gorm.DB, cfg *config.Config) error {
-	if err := db.AutoMigrate(&models.Role{}, &models.Permission{}, &models.User{}, &models.RefreshToken{}, &models.Country{}, &models.Currency{}, &models.OwnerCompany{}, &models.ClientCompany{}); err != nil {
+	if err := db.AutoMigrate(&models.Role{}, &models.Permission{}, &models.User{}, &models.RefreshToken{}, &models.Country{}, &models.Currency{}, &models.OwnerCompany{}, &models.ClientCompany{}, &models.Label{}, &models.Project{}); err != nil {
 		return err
 	}
 
@@ -134,6 +134,156 @@ var permissionCatalog = []defaultPermission{
 		name:        "client_company.delete",
 		category:    "Client Companies",
 		description: "Permanently delete client companies",
+		roles:       []string{},
+	},
+	{
+		name:        "labels.view",
+		category:    "Labels",
+		description: "View labels",
+		roles:       []string{models.RoleManager},
+	},
+	{
+		name:        "labels.create",
+		category:    "Labels",
+		description: "Create labels",
+		roles:       []string{},
+	},
+	{
+		name:        "labels.edit",
+		category:    "Labels",
+		description: "Edit labels",
+		roles:       []string{},
+	},
+	{
+		name:        "labels.archive",
+		category:    "Labels",
+		description: "Archive labels",
+		roles:       []string{},
+	},
+	{
+		name:        "labels.restore",
+		category:    "Labels",
+		description: "Restore archived labels",
+		roles:       []string{},
+	},
+	{
+		name:        "labels.delete",
+		category:    "Labels",
+		description: "Permanently delete labels",
+		roles:       []string{},
+	},
+	{
+		name:        "project.view",
+		category:    "Projects",
+		description: "View projects (restricted to accessible ones for non-admins)",
+		roles:       []string{models.RoleManager, models.RoleTeamMember, models.RoleClient},
+	},
+	{
+		name:        "project.create",
+		category:    "Projects",
+		description: "Create projects",
+		roles:       []string{models.RoleManager},
+	},
+	{
+		name:        "project.edit",
+		category:    "Projects",
+		description: "Edit projects",
+		roles:       []string{models.RoleManager},
+	},
+	{
+		name:        "project.archive",
+		category:    "Projects",
+		description: "Archive projects",
+		roles:       []string{models.RoleManager},
+	},
+	{
+		name:        "project.restore",
+		category:    "Projects",
+		description: "Restore archived projects",
+		roles:       []string{models.RoleManager},
+	},
+	{
+		name:        "project.delete",
+		category:    "Projects",
+		description: "Permanently delete projects",
+		roles:       []string{},
+	},
+	{
+		name:        "project.manage_access",
+		category:    "Projects",
+		description: "Grant or revoke user access to a project",
+		roles:       []string{models.RoleManager},
+	},
+	{
+		name:        "user.view",
+		category:    "Users",
+		description: "View internal users (manager, team member)",
+		roles:       []string{models.RoleManager},
+	},
+	{
+		name:        "user.create",
+		category:    "Users",
+		description: "Create internal users",
+		roles:       []string{},
+	},
+	{
+		name:        "user.edit",
+		category:    "Users",
+		description: "Edit internal users",
+		roles:       []string{},
+	},
+	{
+		name:        "user.archive",
+		category:    "Users",
+		description: "Archive internal users",
+		roles:       []string{},
+	},
+	{
+		name:        "user.restore",
+		category:    "Users",
+		description: "Restore archived internal users",
+		roles:       []string{},
+	},
+	{
+		name:        "user.delete",
+		category:    "Users",
+		description: "Permanently delete internal users",
+		roles:       []string{},
+	},
+	{
+		name:        "client_user.view",
+		category:    "Client Users",
+		description: "View client users",
+		roles:       []string{models.RoleManager},
+	},
+	{
+		name:        "client_user.create",
+		category:    "Client Users",
+		description: "Create client users",
+		roles:       []string{models.RoleManager},
+	},
+	{
+		name:        "client_user.edit",
+		category:    "Client Users",
+		description: "Edit client users",
+		roles:       []string{},
+	},
+	{
+		name:        "client_user.archive",
+		category:    "Client Users",
+		description: "Archive client users",
+		roles:       []string{models.RoleManager},
+	},
+	{
+		name:        "client_user.restore",
+		category:    "Client Users",
+		description: "Restore archived client users",
+		roles:       []string{models.RoleManager},
+	},
+	{
+		name:        "client_user.delete",
+		category:    "Client Users",
+		description: "Permanently delete client users",
 		roles:       []string{},
 	},
 }

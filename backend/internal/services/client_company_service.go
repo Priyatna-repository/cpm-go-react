@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"mime/multipart"
 
 	"github.com/Priyatna-repository/cpm-go-react/backend/internal/models"
@@ -14,6 +15,23 @@ type ClientCompanyService struct {
 
 func NewClientCompanyService(db *gorm.DB, uploads *UploadService) *ClientCompanyService {
 	return &ClientCompanyService{db: db, uploads: uploads}
+}
+
+var ErrClientAlreadyLinked = errors.New("one or more selected clients already belong to a different client company")
+var ErrClientCompanyHasProjects = errors.New("cannot delete a client company that has projects")
+
+func validateClientExclusivity(tx *gorm.DB, companyID uint, clientIDs []uint) error {
+	var count int64
+	err := tx.Table("client_company_user").
+		Where("user_id IN ? AND client_company_id != ?", clientIDs, companyID).
+		Count(&count).Error
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return ErrClientAlreadyLinked
+	}
+	return nil
 }
 
 type ListClientCompaniesParams struct {
@@ -110,6 +128,9 @@ func (s *ClientCompanyService) Create(input ClientCompanyInput, logo *multipart.
 		if len(input.ClientIDs) == 0 {
 			return nil
 		}
+		if err := validateClientExclusivity(tx, company.ID, input.ClientIDs); err != nil {
+			return err
+		}
 		var clients []models.User
 		if err := tx.Where("id IN ?", input.ClientIDs).Find(&clients).Error; err != nil {
 			return err
@@ -155,14 +176,13 @@ func (s *ClientCompanyService) Update(id uint, input ClientCompanyInput, logo *m
 
 		var clients []models.User
 		if len(input.ClientIDs) > 0 {
+			if err := validateClientExclusivity(tx, company.ID, input.ClientIDs); err != nil {
+				return err
+			}
 			if err := tx.Where("id IN ?", input.ClientIDs).Find(&clients).Error; err != nil {
 				return err
 			}
 		}
-		// Always Replace, even with an empty slice (which clears every
-		// assignment). The reference app's sync() only ran when the list
-		// was non-empty, so an admin could never actually remove every
-		// assigned client through the UI — we don't repeat that bug.
 		return tx.Model(&company).Association("Clients").Replace(clients)
 	})
 	if err != nil {
@@ -201,11 +221,7 @@ func (s *ClientCompanyService) Restore(id uint) error {
 	return nil
 }
 
-// ForceDelete permanently removes a client company. Once the Project
-// module exists (client_company_id FK on projects), this will need to
-// translate a foreign-key-violation DB error into a friendly "has related
-// records" response instead of a raw 500 — not needed yet, since nothing
-// references client companies today.
+// ForceDelete permanently removes a client company.
 func (s *ClientCompanyService) ForceDelete(id uint) error {
 	var company models.ClientCompany
 	if err := s.db.First(&company, id).Error; err != nil {
@@ -219,6 +235,9 @@ func (s *ClientCompanyService) ForceDelete(id uint) error {
 		return tx.Delete(&company).Error
 	})
 	if err != nil {
+		if isForeignKeyViolation(err) {
+			return ErrClientCompanyHasProjects
+		}
 		return err
 	}
 

@@ -297,8 +297,17 @@ func (h *ClientCompanyHandler) ForceDelete(c *gin.Context) {
 // @Success      200  {array}   ClientUserResponse
 // @Failure      401  {object}  map[string]string
 // @Router       /api/v1/lookups/client-users [get]
+// @Param        company_id  query  int  false  "Exclude: keep this company's own members visible too"
 func (h *ClientCompanyHandler) ListClientUsers(c *gin.Context) {
-	users, err := h.users.ListClientUsers()
+	var excludeCompanyID *uint
+	if raw := c.Query("company_id"); raw != "" {
+		if id, err := strconv.ParseUint(raw, 10, 64); err == nil {
+			v := uint(id)
+			excludeCompanyID = &v
+		}
+	}
+
+	users, err := h.users.ListClientUsers(excludeCompanyID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load client users"})
 		return
@@ -319,6 +328,10 @@ func respondClientCompanyError(c *gin.Context, err error) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported image type (use jpg, png, or gif)"})
 	case errors.Is(err, gorm.ErrRecordNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": "client company not found"})
+	case errors.Is(err, services.ErrClientAlreadyLinked):
+		c.JSON(http.StatusConflict, gin.H{"error": "one or more selected clients already belong to a different client company"})
+	case errors.Is(err, services.ErrClientCompanyHasProjects):
+		c.JSON(http.StatusConflict, gin.H{"error": "cannot delete a client company that has projects"})
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save client company"})
 	}
@@ -330,4 +343,27 @@ func parseUintParam(c *gin.Context, name string) (uint, error) {
 		return 0, err
 	}
 	return uint(v), nil
+}
+
+// ListInternalUsers godoc
+// @Summary      List non-client users
+// @Description  For the "grant project access" picker. Requires project.view.
+// @Tags         client-companies
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {array}   ClientUserResponse
+// @Failure      401  {object}  map[string]string
+// @Router       /api/v1/lookups/internal-users [get]
+func (h *ClientCompanyHandler) ListInternalUsers(c *gin.Context) {
+	users, err := h.users.ListInternalUsers()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load users"})
+		return
+	}
+
+	resp := make([]ClientUserResponse, 0, len(users))
+	for _, u := range users {
+		resp = append(resp, ClientUserResponse{ID: u.ID, Name: u.Name})
+	}
+	c.JSON(http.StatusOK, resp)
 }

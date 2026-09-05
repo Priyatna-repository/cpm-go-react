@@ -28,7 +28,19 @@ export async function listCurrencies(): Promise<Currency[]> {
   return data;
 }
 
-export async function listClientUsers(): Promise<ClientUser[]> {
-  const { data } = await apiClient.get<ClientUser[]>('/api/v1/lookups/client-users');
+export async function listClientUsers(excludeCompanyId?: number): Promise<ClientUser[]> {
+  const { data } = await apiClient.get<ClientUser[]>('/api/v1/lookups/client-users', {
+    params: { company_id: excludeCompanyId },
+  });
+  return data;
+}
+
+export interface InternalUser {
+  id: number;
+  name: string;
+}
+
+export async function listInternalUsers(): Promise<InternalUser[]> {
+  const { data } = await apiClient.get<InternalUser[]>('/api/v1/lookups/internal-users');
   return data;
 }

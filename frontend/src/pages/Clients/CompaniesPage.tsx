@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useDebouncedValue } from '@mantine/hooks';
 import {
   ActionIcon, Alert, Avatar, Button, Group, Modal, MultiSelect, Pagination,
   Select, Stack, Table, Text, TextInput, Title, Tooltip,
 } from '@mantine/core';
+import { LogoUpload } from '../../components/LogoUpload';
 import {
   IconAlertTriangle, IconArchive, IconEdit, IconPlus, IconRestore, IconTrash,
 } from '@tabler/icons-react';
@@ -21,8 +23,9 @@ export function CompaniesPage() {
   const [companies, setCompanies] = useState<ClientCompany[]>([]);
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
-  const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
+  const [search] = useDebouncedValue(searchInput, 400);
+
   const [showArchived, setShowArchived] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,12 +41,8 @@ export function CompaniesPage() {
   const [formError, setFormError] = useState<string | null>(null);
 
     useEffect(() => {
-    const timeout = setTimeout(() => {
-      setPage(1);
-      setSearch(searchInput);
-    }, 400);
-    return () => clearTimeout(timeout);
-  }, [searchInput]);
+    setPage(1);
+  }, [search]);
 
   const loadCompanies = useCallback(async () => {
     setLoading(true);
@@ -65,25 +64,24 @@ export function CompaniesPage() {
 
   useEffect(() => {
     (async () => {
-      const [countryList, currencyList, userList] = await Promise.all([
+      const [countryList, currencyList] = await Promise.all([
         lookupsApi.listCountries(),
         lookupsApi.listCurrencies(),
-        lookupsApi.listClientUsers(),
       ]);
       setCountries(countryList);
       setCurrencies(currencyList);
-      setClientUsers(userList);
     })();
   }, []);
 
-  function openCreate() {
+  async function openCreate() {
     setEditingId(null);
     setForm(emptyForm);
     setFormError(null);
     setModalOpen(true);
+    setClientUsers(await lookupsApi.listClientUsers());
   }
 
-  function openEdit(company: ClientCompany) {
+  async function openEdit(company: ClientCompany) {
     setEditingId(company.id);
     setForm({
       name: company.name,
@@ -100,6 +98,7 @@ export function CompaniesPage() {
     });
     setFormError(null);
     setModalOpen(true);
+    setClientUsers(await lookupsApi.listClientUsers(company.id));
   }
 
   async function handleSave(e: FormEvent) {
@@ -326,14 +325,11 @@ export function CompaniesPage() {
               onChange={(values) => setForm((f) => ({ ...f, client_ids: values.map(Number) }))}
               searchable
             />
-            <div>
-              <Text size="sm" fw={500} mb={4}>Logo</Text>
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/gif"
-                onChange={(e) => setForm((f) => ({ ...f, logo: e.target.files?.[0] ?? null }))}
-              />
-            </div>
+            <LogoUpload
+              currentUrl={editingId ? companies.find((c) => c.id === editingId)?.logo && `${import.meta.env.VITE_API_BASE_URL}${companies.find((c) => c.id === editingId)?.logo}` : undefined}
+              fallbackText={form.name || '?'}
+              onChange={(file) => setForm((f) => ({ ...f, logo: file }))}
+            />
             <Group justify="flex-end" mt="md">
               <Button variant="default" onClick={() => setModalOpen(false)}>Cancel</Button>
               <Button type="submit" loading={saving}>Save</Button>

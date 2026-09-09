@@ -14,7 +14,7 @@ import (
 // permission catalog, and a bootstrap admin user (from ADMIN_* env vars) if
 // one doesn't exist yet.
 func Migrate(db *gorm.DB, cfg *config.Config) error {
-	if err := db.AutoMigrate(&models.Role{}, &models.Permission{}, &models.User{}, &models.RefreshToken{}, &models.Country{}, &models.Currency{}, &models.OwnerCompany{}, &models.ClientCompany{}, &models.Label{}, &models.Project{}); err != nil {
+	if err := db.AutoMigrate(&models.Role{}, &models.Permission{}, &models.User{}, &models.RefreshToken{}, &models.Country{}, &models.Currency{}, &models.OwnerCompany{}, &models.ClientCompany{}, &models.Label{}, &models.Project{}, &models.Task{}, &models.TaskDependency{}); err != nil {
 		return err
 	}
 
@@ -285,6 +285,21 @@ var permissionCatalog = []defaultPermission{
 		category:    "Client Users",
 		description: "Permanently delete client users",
 		roles:       []string{},
+	},
+	// task.view mirrors project.view's role set — seeing a project's tasks
+	// is part of viewing the project, not a manager-only privilege (team
+	// members and clients need to see the task board too).
+	{name: "task.view", category: "Tasks", description: "View tasks", roles: []string{models.RoleManager, models.RoleTeamMember, models.RoleClient}},
+	{name: "task.create", category: "Tasks", description: "Create tasks", roles: []string{models.RoleManager}},
+	{name: "task.edit", category: "Tasks", description: "Edit tasks", roles: []string{models.RoleManager}},
+	{name: "task.archive", category: "Tasks", description: "Archive tasks", roles: []string{models.RoleManager}},
+	{name: "task.restore", category: "Tasks", description: "Restore archived tasks", roles: []string{models.RoleManager}},
+	{name: "task.delete", category: "Tasks", description: "Permanently delete tasks", roles: []string{}},
+	{
+		name:        "task.manage_dependencies",
+		category:    "Tasks",
+		description: "Create or remove dependencies between tasks",
+		roles:       []string{models.RoleManager},
 	},
 }
 

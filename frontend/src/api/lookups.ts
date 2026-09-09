@@ -38,6 +38,7 @@ export async function listClientUsers(excludeCompanyId?: number): Promise<Client
 export interface InternalUser {
   id: number;
   name: string;
+  avatar?: string;
 }
 
 export async function listInternalUsers(): Promise<InternalUser[]> {

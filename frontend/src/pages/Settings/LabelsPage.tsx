@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import {
-  ActionIcon, Alert, Badge, Button, ColorInput, Group, Modal, Pagination,
+  ActionIcon, Alert, Autocomplete, Badge, Button, ColorInput, Group, Modal, Pagination,
   Select, Stack, Table, Text, TextInput, Title, Tooltip,
 } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
@@ -10,6 +10,7 @@ import {
 import * as api from '../../api/labels';
 import type { Label, LabelInput } from '../../api/labels';
 import { LABEL_TYPES } from '../../constants/labelTypes';
+import { TABLER_ICON_NAMES, resolveIcon } from '../../utils/tablerIcons';
 import { useAuth } from '../../auth/AuthContext';
 import { errorMessage } from '../../utils/errors';
 
@@ -129,7 +130,7 @@ export function LabelsPage() {
   return (
     <Stack p="xl">
       <Group justify="space-between">
-        <Title order={2}>Labels</Title>
+        <Title order={2}>Tags</Title>
         {can('labels.create') && (
           <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
             Create
@@ -170,7 +171,7 @@ export function LabelsPage() {
         <Table>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Label</Table.Th>
+              <Table.Th>Tags name</Table.Th>
               <Table.Th>Type</Table.Th>
               <Table.Th>Slug</Table.Th>
               <Table.Th>Actions</Table.Th>
@@ -180,9 +181,18 @@ export function LabelsPage() {
             {labels.map((label) => (
               <Table.Tr key={label.id}>
                 <Table.Td>
-                  <Badge style={label.color ? { backgroundColor: label.color } : undefined}>
+                  <Badge
+                    leftSection={
+                      (() => {
+                        const Icon = resolveIcon(label.icon);
+                        return Icon ? <Icon size={12} /> : null;
+                      })()
+                    }
+                    style={label.color ? { backgroundColor: label.color } : undefined}
+                  >
                     {label.name}
                   </Badge>
+
                 </Table.Td>
                 <Table.Td>
                   <Text size="sm">{LABEL_TYPES.find((t) => t.value === label.type)?.label ?? label.type}</Text>
@@ -268,12 +278,30 @@ export function LabelsPage() {
               value={form.color}
               onChange={(color) => setForm((f) => ({ ...f, color }))}
             />
-            <TextInput
+            <Autocomplete
               label="Icon"
-              description="A Tabler icon name, e.g. IconFlag (free text — not validated against the icon library yet)"
+              description="Start typing to search Tabler icon names"
+              data={TABLER_ICON_NAMES}
+              limit={20}
               value={form.icon ?? ''}
-              onChange={(e) => setForm((f) => ({ ...f, icon: e.currentTarget.value }))}
+              onChange={(value) => setForm((f) => ({ ...f, icon: value }))}
+              renderOption={({ option }) => {
+                const OptionIcon = resolveIcon(option.value);
+                return (
+                  <Group gap={8} wrap="nowrap">
+                    {OptionIcon && <OptionIcon size={16} />}
+                    <Text size="sm">{option.value}</Text>
+                  </Group>
+                );
+              }}
+              leftSection={
+                (() => {
+                  const PreviewIcon = resolveIcon(form.icon);
+                  return PreviewIcon ? <PreviewIcon size={16} /> : null;
+                })()
+              }
             />
+
             <Group justify="flex-end" mt="md">
               <Button variant="default" onClick={() => setModalOpen(false)}>Cancel</Button>
               <Button type="submit" loading={saving}>Save</Button>

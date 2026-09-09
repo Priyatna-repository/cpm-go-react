@@ -140,6 +140,45 @@ func Setup(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 			)
 		}
 
+		// task endpoints, nested under a project — :id here is the
+		// PROJECT id (same param name project routes already use), so
+		// RequireProjectAccess (which reads c.Param("id")) works unmodified.
+		taskService := services.NewTaskService(db)
+		taskSchedulingService := services.NewTaskSchedulingService(db)
+		taskHandler := handlers.NewTaskHandler(taskService, taskSchedulingService)
+		tasks := projects.Group("/:id/tasks")
+		{
+			tasks.GET("", middleware.RequirePermission(permService, "task.view"), middleware.RequireProjectAccess(projectService), taskHandler.List)
+			tasks.POST("", middleware.RequirePermission(permService, "task.create"), middleware.RequireProjectAccess(projectService), taskHandler.Create)
+			tasks.GET("/:taskId", middleware.RequirePermission(permService, "task.view"), middleware.RequireProjectAccess(projectService), taskHandler.Get)
+			tasks.PUT("/:taskId", middleware.RequirePermission(permService, "task.edit"), middleware.RequireProjectAccess(projectService), taskHandler.Update)
+			tasks.DELETE("/:taskId", middleware.RequirePermission(permService, "task.archive"), middleware.RequireProjectAccess(projectService), taskHandler.Archive)
+			tasks.POST("/:taskId/restore", middleware.RequirePermission(permService, "task.restore"), middleware.RequireProjectAccess(projectService), taskHandler.Restore)
+			tasks.DELETE("/:taskId/force", middleware.RequirePermission(permService, "task.delete"), middleware.RequireProjectAccess(projectService), taskHandler.ForceDelete)
+			tasks.PUT("/:taskId/reschedule", middleware.RequirePermission(permService, "task.edit"), middleware.RequireProjectAccess(projectService), taskHandler.Reschedule)
+			tasks.PUT("/:taskId/complete", middleware.RequirePermission(permService, "task.edit"), middleware.RequireProjectAccess(projectService), taskHandler.SetTaskCompleted)
+		}
+		taskDependencyService := services.NewTaskDependencyService(db)
+		taskDependencyHandler := handlers.NewTaskDependencyHandler(taskDependencyService)
+		dependencies := projects.Group("/:id/dependencies")
+		{
+			dependencies.GET("",
+				middleware.RequirePermission(permService, "task.view"),
+				middleware.RequireProjectAccess(projectService),
+				taskDependencyHandler.List,
+			)
+			dependencies.POST("",
+				middleware.RequirePermission(permService, "task.manage_dependencies"),
+				middleware.RequireProjectAccess(projectService),
+				taskDependencyHandler.Create,
+			)
+			dependencies.DELETE("/:depId",
+				middleware.RequirePermission(permService, "task.manage_dependencies"),
+				middleware.RequireProjectAccess(projectService),
+				taskDependencyHandler.Delete,
+			)
+		}
+
 		userService := services.NewUserService(db, uploadService)
 		// internal user endpoints
 		internalUserHandler := handlers.NewUserHandler(userService, services.UserScopeInternal)

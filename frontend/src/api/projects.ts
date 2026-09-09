@@ -69,6 +69,11 @@ export interface ProjectInput {
   status_label_ids: number[];
 }
 
+export async function getProject(id: number): Promise<Project> {
+  const { data } = await apiClient.get<Project>(`/api/v1/projects/${id}`);
+  return data;
+}
+
 export async function createProject(input: ProjectInput): Promise<Project> {
   const { data } = await apiClient.post<Project>('/api/v1/projects', input);
   return data;

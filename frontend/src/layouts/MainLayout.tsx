@@ -1,5 +1,7 @@
 import { AppShell, Avatar, Burger, Group, Menu, NavLink, ScrollArea, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
+import { useState, useEffect } from 'react';
+import { LayoutChromeContext } from './LayoutChromeContext';
 import {
   IconActivity,
   IconBuilding,
@@ -222,7 +224,12 @@ export function MainLayout() {
   const [mobileOpened, { toggle: toggleMobile }] = useDisclosure();
   const [desktopCollapsed, { toggle: toggleDesktop }] = useDisclosure(false);
   const { user, can, logout } = useAuth();
+  const [fullscreen, setFullscreen] = useState(false);
   const location = useLocation();
+
+  useEffect(() => {
+    setFullscreen(false);
+  }, [location.pathname]);
 
   const handleStartTour = () => {
     // Hook this up to your tour library, e.g. driver.js, react-joyride, intro.js
@@ -232,13 +239,13 @@ export function MainLayout() {
 
   return (
     <AppShell
-      header={{ height: 60 }}
+      header={{ height: 60, collapsed: fullscreen }}
       navbar={{
         width: desktopCollapsed ? 80 : 240,
         breakpoint: 'sm',
-        collapsed: { mobile: !mobileOpened, desktop: false },
+        collapsed: { mobile: !mobileOpened, desktop: fullscreen && !mobileOpened },
       }}
-      padding="md"
+      padding={fullscreen ? 0 : 'md'}
       transitionDuration={200}
     >
       <AppShell.Header>
@@ -305,8 +312,11 @@ export function MainLayout() {
       </AppShell.Navbar>
 
       <AppShell.Main>
-        <Outlet />
+        <LayoutChromeContext.Provider value={{ fullscreen, setFullscreen, onOpenNav: toggleMobile }}>
+          <Outlet />
+        </LayoutChromeContext.Provider>
       </AppShell.Main>
+
     </AppShell>
   );
 }

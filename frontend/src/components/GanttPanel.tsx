@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Gantt, Toolbar, Willow } from '@svar-ui/react-gantt';
 import '@svar-ui/react-gantt/all.css';
-import { Alert, Text, Avatar, Badge, Group, Tooltip, Stack } from '@mantine/core';
+import './style/gantt-overrides.css';
+import { Alert, Text, Avatar, Badge, Group, Tooltip, Stack, ActionIcon } from '@mantine/core';
+import { IconArrowsMaximize, IconArrowsMinimize, IconLayoutSidebarLeftExpand } from '@tabler/icons-react';
+import { useLayoutChrome } from '../layouts/LayoutChromeContext';
 import * as tasksApi from '../api/tasks';
 import type { Task, TaskType, TaskInput } from '../api/tasks';
 import * as depsApi from '../api/taskDependencies';
@@ -63,18 +66,38 @@ function toSvarData(tasks: Task[], deps: TaskDependency[]) {
   const hasChildren = (id: number) => tasks.some((t) => t.parent_task_id === id);
   const renderable = tasks.filter((t) => t.type !== 'summary' || hasChildren(t.id) || (t.start_date && t.end_date));
 
-  const svarTasks: SvarTask[] = renderable.map((t) => ({
-    id: t.id,
-    text: t.name,
-    start: t.start_date ? new Date(t.start_date) : undefined,
-    end: t.end_date ? new Date(t.end_date) : undefined,
-    progress: t.progress,
-    type: t.type,
-    parent: t.parent_task_id ?? 0,
-    assigned_to_user_id: t.assigned_to_user?.id,
-    status_label_id: t.status_label?.id,
-    budget_plan: t.budget_plan,
-  }));
+  const svarTasks: SvarTask[] = renderable.map((t) => {
+    let start = t.start_date ? new Date(t.start_date) : undefined;
+    let end = t.end_date ? new Date(t.end_date) : undefined;
+    // Summary rows with neither dates nor children are already excluded
+    // above (`renderable`); summary rows WITH children are meant to keep
+    // start/end undefined so SVAR computes their bar span from those
+    // children automatically. Every non-summary row, though, MUST get real
+    // Date objects: SVAR's internal position/sort math (run on every
+    // add-task, drag, etc.) calls .valueOf() on every task's start/end
+    // unconditionally — one undefined value throws and silently breaks the
+    // whole action pipeline. A task created via the inline "+ New task"
+    // flow (name only, no dates yet) is exactly this case, and without a
+    // fallback here it doesn't just fail to render — it corrupts the *next*
+    // add-task click too, since the same undefined value is still sitting
+    // in the store when that click's own position math runs.
+    if (t.type !== 'summary') {
+      start = start ?? new Date();
+      end = end ?? new Date(start.getTime() + 24 * 60 * 60 * 1000);
+    }
+    return {
+      id: t.id,
+      text: t.name,
+      start,
+      end,
+      progress: t.progress,
+      type: t.type,
+      parent: t.parent_task_id ?? 0,
+      assigned_to_user_id: t.assigned_to_user?.id,
+      status_label_id: t.status_label?.id,
+      budget_plan: t.budget_plan,
+    };
+  });
   const svarLinks: SvarLink[] = deps.map((d) => ({
     id: d.id,
     source: d.depends_on_task_id,
@@ -193,19 +216,27 @@ function buildColumns(internalUsers: InternalUser[], statusLabels: Label[], svar
   const wbsById = computeWbsMap(svarTasks);
   return [
     { id: 'wbs', header: '#', align: 'center' as const, width: 70, getter: (t: any) => wbsById.get(t.id) ?? '' },
-    { id: 'text', header: 'Task name' },
-    { id: 'assigned_to_user_id', header: 'Assignee', align: 'center' as const, cell: AssigneeCell },
-    { id: 'start', header: 'Start', align: 'center' as const },
-    { id: 'end', header: 'End', align: 'center' as const },
+    { id: 'text', header: 'Task name', editor: 'text' as const },
+    {
+      id: 'assigned_to_user_id', header: 'Assignee', align: 'center' as const, cell: AssigneeCell,
+      editor: { type: 'richselect', config: { options: internalUsers.map((u) => ({ id: u.id, label: u.name })) } },
+    },
+    { id: 'start', header: 'Start', align: 'center' as const, editor: 'datepicker' as const },
+    { id: 'end', header: 'End', align: 'center' as const, editor: 'datepicker' as const },
     { id: 'duration', header: 'Duration', align: 'center' as const },
     { id: 'progress', header: 'Progress', align: 'center' as const, getter: (t: any) => (t.progress != null ? `${Math.round(t.progress)}%` : '—'), },
-    { id: 'status_label_id', header: 'Status', align: 'center' as const, cell: StatusCell },
-    { id: 'budget_plan', header: 'Budget', align: 'center' as const, getter: (t: any) => (t.budget_plan != null ? formatBudget(t.budget_plan) : '—'), },
-    { id: 'predecessors', header: 'Predecessors', align: 'center' as const, cell: PredecessorsCell },
+    {
+      id: 'status_label_id', header: 'Status', align: 'center' as const, cell: StatusCell,
+      editor: { type: 'richselect', config: { options: statusLabels.map((l) => ({ id: l.id, label: l.name })) } },
+    },
+    { id: 'budget_plan', header: 'Budget', align: 'center' as const, getter: (t: any) => (t.budget_plan != null ? formatBudget(t.budget_plan) : '—'), editor: 'text' as const },
+    { id: 'predecessors', header: 'Predecessors', align: 'center' as const, width: 130, cell: PredecessorsCell },
   ];
 }
 
+
 export function GanttPanel({ projectId }: { projectId: number }) {
+  const { fullscreen, setFullscreen, onOpenNav } = useLayoutChrome();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [svarTasks, setSvarTasks] = useState<SvarTask[]>([]);
@@ -232,6 +263,7 @@ export function GanttPanel({ projectId }: { projectId: number }) {
   // doesn't satisfy their prop type. The Gantt ref callback below sets both.
   const apiRef = useRef<any>(null);
   const [ganttApi, setGanttApi] = useState<any>(null);
+
 
   // Must be stable (useCallback, not an inline arrow in the JSX below) — an
   // inline function is a new identity every render, so React would detach
@@ -286,6 +318,72 @@ export function GanttPanel({ projectId }: { projectId: number }) {
     return () => ganttApi.detach('task-edit-drawer');
   }, [ganttApi]);
 
+  // Toolbar's Indent/Outdent (and drag-to-reparent) both dispatch
+  // 'move-task', not 'update-task' — verified in gantt-store's own
+  // move-task handler: it mutates its internal tree directly via
+  // setState(), it never calls exec('update-task', ...), so our
+  // onUpdateTask prop never sees these at all. Persisting here reads the
+  // outcome back via getTask() after SVAR's own handler has already run
+  // (on() listeners fire after the internal default one), rather than
+  // trying to replicate its up/down/before/after/child positioning logic
+  // ourselves. Reordering siblings with no parent change is deliberately
+  // NOT persisted — there's no order_column write path on the backend yet.
+  useEffect(() => {
+    if (!ganttApi) return;
+    const handler = (ev: { id: string | number }) => {
+      setTimeout(async () => {
+        const taskId = Number(ev.id);
+        const current = tasksByIdRef.current.get(taskId);
+        const updated = apiRef.current?.getTask(ev.id);
+        if (!current || !updated) return;
+        const newParentId = updated.parent && Number(updated.parent) !== 0 ? Number(updated.parent) : null;
+        if (newParentId === (current.parent_task_id ?? null)) return;
+        // Backend only allows nesting under a Summary task (validateParent)
+        // — SVAR's Indent has no concept of that rule and will try to nest
+        // under whatever row precedes it. Catch it here with a clear
+        // message and revert, instead of a generic 400 after the fact.
+        const newParentTask = newParentId != null ? tasksByIdRef.current.get(newParentId) : null;
+        if (newParentId != null && newParentTask?.type !== 'summary') {
+          setError('Can only nest a task under a Summary task.');
+          await load();
+          return;
+        }
+        try {
+          await tasksApi.updateTask(projectId, taskId, {
+            type: current.type,
+            parent_task_id: newParentId,
+            name: current.name,
+            description: current.description,
+            assigned_to_user_id: current.assigned_to_user?.id ?? null,
+            start_date: current.start_date,
+            end_date: current.end_date,
+            budget_plan: current.budget_plan,
+            budget_actual: current.budget_actual,
+            weight: current.weight,
+            status_label_id: current.status_label?.id ?? null,
+          });
+        } catch (err) {
+          setError(errorMessage(err, 'Failed to move task'));
+        } finally {
+          await load();
+        }
+      });
+    };
+    ganttApi.on('move-task', handler, { tag: 'persist-move' });
+    return () => ganttApi.detach('persist-move');
+  }, [ganttApi]);
+
+  // Auto-opening the Name cell's inline editor right after "New task" was
+  // attempted here via exec('open-editor', ...) and confirmed NOT to work:
+  // the main task grid's cell-editor state lives on a private, internal
+  // grid-store IApi instance created inside react-gantt's table component
+  // (never exposed to us) — 'open-editor'/'focus-cell' are real actions,
+  // but only that inner instance listens for them. Our own `ganttApi` is a
+  // different, outer instance, so calling exec on it here was a silent
+  // no-op. There's no public API to trigger this from outside; a new row's
+  // Name still needs one double-click to rename.
+
+
   const columns = useMemo(
     () => buildColumns(internalUsers, statusLabels, svarTasks, svarLinks),
     [internalUsers, statusLabels, svarTasks, svarLinks],
@@ -304,7 +402,7 @@ export function GanttPanel({ projectId }: { projectId: number }) {
     }
   };
 
-    const handleToggleCompleted = async (taskId: number, completed: boolean) => {
+  const handleToggleCompleted = async (taskId: number, completed: boolean) => {
     try {
       await tasksApi.setTaskCompleted(projectId, taskId, completed);
       await load();
@@ -350,7 +448,35 @@ export function GanttPanel({ projectId }: { projectId: number }) {
     if (ev.inProgress) return;
     const taskId = Number(ev.id);
     const current = tasksByIdRef.current.get(taskId);
-    if (!current) return;
+    if (!current) {
+      // Not a real backend task yet — SVAR's own default "add-task" flow
+      // (unmodified, we don't intercept it) just inserted a local-only row
+      // with a temp id and opened its inline text editor (editor:'text' on
+      // the "text" column). This 'update-task' is that editor's first
+      // commit — the task is born here, not at add-task time, so a row
+      // abandoned with its placeholder name never touches the DB.
+      const name = ev.task.text?.trim();
+      if (!name) return;
+      try {
+        await tasksApi.createTask(projectId, {
+          type: (ev.task.type as TaskType) || 'task',
+          parent_task_id: ev.task.parent !== undefined && Number(ev.task.parent) !== 0 ? Number(ev.task.parent) : null,
+          name,
+          weight: 0,
+        });
+      } catch (err) {
+        setError(errorMessage(err, 'Failed to create task'));
+      } finally {
+        // load() only swaps the props we hand SVAR (tasks/svarTasks) — it
+        // never tells SVAR's own internal store that the temp:// row it
+        // created is gone. Left behind, that ghost row is what breaks the
+        // *next* "add task" click. delete-task clears it explicitly instead
+        // of relying on the prop swap to do it implicitly.
+        apiRef.current?.exec('delete-task', { id: ev.id });
+        await load();
+      }
+      return;
+    }
 
     const datesChanged = ev.task.start !== undefined || ev.task.end !== undefined || ev.task.duration !== undefined;
     if (datesChanged) {
@@ -428,21 +554,6 @@ export function GanttPanel({ projectId }: { projectId: number }) {
     }
   };
 
-  // Fires when a new row is added via the Toolbar's "Add task" button —
-  // defaults to a plain task; change its type to "summary" or "milestone"
-  // afterward via the Editor form.
-  const handleAddTask = async (ev: { task: Partial<{ text: string; type: string; parent: string | number }> }) => {
-    const parentId = ev.task.parent !== undefined && Number(ev.task.parent) !== 0 ? Number(ev.task.parent) : null;
-    const type = (ev.task.type as TaskType) || 'task';
-    try {
-      await tasksApi.createTask(projectId, { type, parent_task_id: parentId, name: ev.task.text || 'New task', weight: 0 });
-    } catch (err) {
-      setError(errorMessage(err, 'Failed to create task'));
-    } finally {
-      await load();
-    }
-  };
-
   // Fires from the Editor's delete action — maps to our soft Archive, not
   // a permanent delete.
   const handleDeleteTask = async (ev: { id: string | number }) => {
@@ -482,6 +593,28 @@ export function GanttPanel({ projectId }: { projectId: number }) {
     }
   };
 
+  // SVAR's own update-link event only sends whichever field actually
+  // changed (verified from its links-editor source: exec("update-link",
+  // {id, link: {[changedField]: value}})) — merge onto the link's current
+  // values from svarLinks so both relation_type and lag_days always reach
+  // the PUT, which replaces both.
+  const handleUpdateLink = async (ev: { id: string | number; link: { type?: string; lag?: number } }) => {
+    const linkId = Number(ev.id);
+    const current = svarLinks.find((l) => l.id === linkId);
+    if (!current) return;
+    const relation = LINK_TYPE_TO_RELATION[ev.link.type ?? current.type];
+    const lag = ev.link.lag ?? current.lag ?? 0;
+    if (!relation) return;
+
+    try {
+      await depsApi.updateTaskDependency(projectId, linkId, relation, lag);
+      await load();
+    } catch (err) {
+      setError(errorMessage(err, 'Failed to update dependency'));
+      await load();
+    }
+  };
+
   const handleDeleteLink = async (ev: { id: string | number }) => {
     try {
       await depsApi.deleteTaskDependency(projectId, Number(ev.id));
@@ -500,9 +633,9 @@ export function GanttPanel({ projectId }: { projectId: number }) {
       )}
 
       {loading ? (
-        <Text c="dimmed" p="md">Loading Gantt chart…</Text>
+        <Text c="dimmed" p="md" py={'sm'}>Loading Gantt chart…</Text>
       ) : svarTasks.length === 0 ? (
-        <Text c="dimmed" p="md">No tasks yet — use the "Add task" button below to create one.</Text>
+        <Text c="dimmed" p="md" py={'sm'}>No tasks yet — use the "Add task" button below to create one.</Text>
       ) : null}
 
       <div
@@ -524,23 +657,48 @@ export function GanttPanel({ projectId }: { projectId: number }) {
               already reported its api instance — JSX position (not mount
               order) still controls visual placement, so Toolbar stays above
               the chart despite mounting slightly later. */}
-          {ganttApi && <Toolbar api={ganttApi} />}
-          <div style={{ borderTop: '1px solid var(--mantine-color-gray-4)' }}>
+          <Group gap={4} wrap="nowrap" align="stretch" style={{ borderBottom: ganttApi ? undefined : '1px solid var(--mantine-color-gray-4)' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>{ganttApi && <Toolbar api={ganttApi} />}</div>
+            {fullscreen && (
+              <Tooltip label="Open menu" position="left" withArrow>
+                <ActionIcon
+                  variant="subtle"
+                  size="lg"
+                  onClick={onOpenNav}
+                  style={{ alignSelf: 'center' }}
+                >
+                  <IconLayoutSidebarLeftExpand size={18} />
+                </ActionIcon>
+              </Tooltip>
+            )}
+            <Tooltip label={fullscreen ? 'Exit full screen' : 'Full screen'} position="left" withArrow>
+              <ActionIcon
+                variant="subtle"
+                size="lg"
+                onClick={() => setFullscreen(!fullscreen)}
+                style={{ alignSelf: 'center', marginRight: 8 }}
+              >
+                {fullscreen ? <IconArrowsMinimize size={18} /> : <IconArrowsMaximize size={18} />}
+              </ActionIcon>
+            </Tooltip>
+          </Group>
+
+          <div style={{ borderTop: '1px solid var(--mantine-color-gray-4)', flex: 1, minHeight: 0 }}>
             <Gantt
               ref={handleGanttRef}
               tasks={svarTasks}
               links={svarLinks}
               columns={columns}
-              onupdatetask={handleUpdateTask}
-              onaddtask={handleAddTask}
-              ondeletetask={handleDeleteTask}
-              onaddlink={handleAddLink}
-              ondeletelink={handleDeleteLink}
+              onUpdateTask={handleUpdateTask}
+              onDeleteTask={handleDeleteTask}
+              onAddLink={handleAddLink}
+              onUpdateLink={handleUpdateLink}
+              onDeleteLink={handleDeleteLink}
             />
           </div>
           <TaskEditDrawer
             opened={editingTaskId != null}
-            task={editingTaskId != null ? tasks.find((t) => t.id === editingTaskId) ?? null : null}
+            task={tasks.find((t) => t.id === editingTaskId) ?? null}
             tasks={tasks}
             deps={deps}
             internalUsers={internalUsers}
@@ -555,6 +713,7 @@ export function GanttPanel({ projectId }: { projectId: number }) {
             }
             onDeleteDependency={(id) => handleDeleteLink({ id })}
           />
+
 
         </Willow>
       </div>

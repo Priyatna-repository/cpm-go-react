@@ -165,15 +165,6 @@ export function TaskEditDrawer({
         setEndDate(task.end_date ?? '');
     }, [task]);
 
-    // Every time a (possibly different) task's drawer opens, jump back to
-    // the top section instead of staying wherever the previous task's
-    // drawer was scrolled to.
-    useEffect(() => {
-        if (!opened) return;
-        setActiveSection(SECTIONS[0].id);
-        scrollRef.current?.scrollTo({ top: 0 });
-    }, [opened, task?.id]);
-
     if (!task) return null;
 
     async function handleSubmit() {
@@ -261,9 +252,7 @@ export function TaskEditDrawer({
 
     const taskName = (id: number) => tasks.find((t) => t.id === id)?.name ?? `#${id}`;
     const predecessors = deps.filter((d) => d.task_id === task.id);
-    const createdLabel = new Date(task.created_at).toLocaleDateString('id-ID', {
-        day: 'numeric', month: 'short', year: 'numeric',
-    });
+    const createdLabel = new Date(task.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 
     const drawerTitle = (
         <Group gap="sm" wrap="nowrap" align="flex-start">
@@ -415,113 +404,115 @@ export function TaskEditDrawer({
                             </Stack>
                         </div>
 
-                        <div ref={(el) => { sectionRefs.current.links = el; }}>
-                            <Title order={5} mb="sm">Links</Title>
-                            <Stack gap="lg">
-                                <div>
-                                    <Text fw={500} size="sm">Predecessors</Text>
-                                    <Text size="xs" c="dimmed" mb={8}>Tasks this task depends on.</Text>
-                                    {predecessors.length === 0 ? (
-                                        <Text size="sm" c="dimmed">None yet</Text>
-                                    ) : (
-                                        <Stack gap={4}>
-                                            {predecessors.map((d) => (
-                                                <Group key={d.id} justify="space-between" wrap="nowrap">
-                                                    <Text size="sm">
-                                                        {taskName(d.depends_on_task_id)} · {d.relation_type}
-                                                        {d.lag_days ? ` · lag ${d.lag_days}d` : ''}
-                                                    </Text>
-                                                    <ActionIcon variant="subtle" color="red" onClick={() => onDeleteDependency(d.id)}>
-                                                        <IconTrash size={14} />
-                                                    </ActionIcon>
-                                                </Group>
-                                            ))}
-                                        </Stack>
-                                    )}
-                                    <AddDependencyForm
-                                        tasks={tasks}
-                                        currentTaskId={task.id}
-                                        onAdd={(otherId, relation, lag) => onAddDependency(otherId, task.id, relation, lag)}
-                                    />
+                        <>
+                                <div ref={(el) => { sectionRefs.current.links = el; }}>
+                                    <Title order={5} mb="sm">Links</Title>
+                                    <Stack gap="lg">
+                                        <div>
+                                            <Text fw={500} size="sm">Predecessors</Text>
+                                            <Text size="xs" c="dimmed" mb={8}>Tasks this task depends on.</Text>
+                                            {predecessors.length === 0 ? (
+                                                <Text size="sm" c="dimmed">None yet</Text>
+                                            ) : (
+                                                <Stack gap={4}>
+                                                    {predecessors.map((d) => (
+                                                        <Group key={d.id} justify="space-between" wrap="nowrap">
+                                                            <Text size="sm">
+                                                                {taskName(d.depends_on_task_id)} · {d.relation_type}
+                                                                {d.lag_days ? ` · lag ${d.lag_days}d` : ''}
+                                                            </Text>
+                                                            <ActionIcon variant="subtle" color="red" onClick={() => onDeleteDependency(d.id)}>
+                                                                <IconTrash size={14} />
+                                                            </ActionIcon>
+                                                        </Group>
+                                                    ))}
+                                                </Stack>
+                                            )}
+                                            <AddDependencyForm
+                                                tasks={tasks}
+                                                currentTaskId={task.id}
+                                                onAdd={(otherId, relation, lag) => onAddDependency(otherId, task.id, relation, lag)}
+                                            />
+                                        </div>
+
+                                        <Divider />
+                                    </Stack>
                                 </div>
 
-                                <Divider />
-                            </Stack>
-                        </div>
+                                <div ref={(el) => { sectionRefs.current.timeline = el; }}>
+                                    <Title order={5} mb="sm">Timeline &amp; Budget</Title>
+                                    <Stack gap="sm">
+                                        <Group grow align="flex-end">
+                                            <TextInput
+                                                type="date"
+                                                label="Start date"
+                                                value={startDate}
+                                                onChange={(e) => setStartDate(e.currentTarget.value)}
+                                            />
+                                            <TextInput
+                                                type="date"
+                                                label="End date"
+                                                value={endDate}
+                                                onChange={(e) => setEndDate(e.currentTarget.value)}
+                                            />
+                                        </Group>
+                                        <Group justify="space-between" align="center">
+                                            <Text size="xs" c="dimmed" style={{ flex: 1 }}>
+                                                Changing dates here goes through the same reschedule cascade as dragging on the
+                                                chart — dependent tasks may shift too.
+                                            </Text>
+                                            <Button
+                                                size="xs"
+                                                variant="light"
+                                                onClick={handleReschedule}
+                                                loading={rescheduling}
+                                                disabled={startDate === (task.start_date ?? '') && endDate === (task.end_date ?? '')}
+                                            >
+                                                Reschedule
+                                            </Button>
+                                        </Group>
+                                        <NumberInput
+                                            label="Budget plan"
+                                            value={budgetPlan}
+                                            onChange={(v) => setBudgetPlan(v === '' ? '' : Number(v))}
+                                            prefix="Rp "
+                                            thousandSeparator="."
+                                            decimalScale={0}
+                                            decimalSeparator=','
+                                            min={0}
+                                        />
+                                        <Text size="sm" c="dimmed">
+                                            Actual: {task.budget_actual != null ? formatBudget(task.budget_actual) : '—'}
+                                        </Text>
+                                    </Stack>
+                                </div>
 
-                        <div ref={(el) => { sectionRefs.current.timeline = el; }}>
-                            <Title order={5} mb="sm">Timeline &amp; Budget</Title>
-                            <Stack gap="sm">
-                                <Group grow align="flex-end">
-                                    <TextInput
-                                        type="date"
-                                        label="Start date"
-                                        value={startDate}
-                                        onChange={(e) => setStartDate(e.currentTarget.value)}
-                                    />
-                                    <TextInput
-                                        type="date"
-                                        label="End date"
-                                        value={endDate}
-                                        onChange={(e) => setEndDate(e.currentTarget.value)}
-                                    />
-                                </Group>
-                                <Group justify="space-between" align="center">
-                                    <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-                                        Changing dates here goes through the same reschedule cascade as dragging on the
-                                        chart — dependent tasks may shift too.
-                                    </Text>
-                                    <Button
-                                        size="xs"
-                                        variant="light"
-                                        onClick={handleReschedule}
-                                        loading={rescheduling}
-                                        disabled={startDate === (task.start_date ?? '') && endDate === (task.end_date ?? '')}
-                                    >
-                                        Reschedule
-                                    </Button>
-                                </Group>
-                                <NumberInput
-                                    label="Budget plan"
-                                    value={budgetPlan}
-                                    onChange={(v) => setBudgetPlan(v === '' ? '' : Number(v))}
-                                    prefix="Rp "
-                                    thousandSeparator="."
-                                    decimalScale={0}
-                                    decimalSeparator=','
-                                    min={0}
-                                />
-                                <Text size="sm" c="dimmed">
-                                    Actual: {task.budget_actual != null ? formatBudget(task.budget_actual) : '—'}
-                                </Text>
-                            </Stack>
-                        </div>
+                                <div ref={(el) => { sectionRefs.current.resources = el; }}>
+                                    <Title order={5} mb="sm">Resources</Title>
+                                    <Text c="dimmed" size="sm">This feature isn't built yet — coming in a future update.</Text>
+                                </div>
 
-                        <div ref={(el) => { sectionRefs.current.resources = el; }}>
-                            <Title order={5} mb="sm">Resources</Title>
-                            <Text c="dimmed" size="sm">This feature isn't built yet — coming in a future update.</Text>
-                        </div>
+                                <div ref={(el) => { sectionRefs.current.work = el; }}>
+                                    <Title order={5} mb="sm">Work Reports</Title>
+                                    <Text c="dimmed" size="sm">This feature isn't built yet — coming in a future update.</Text>
+                                </div>
 
-                        <div ref={(el) => { sectionRefs.current.work = el; }}>
-                            <Title order={5} mb="sm">Work Reports</Title>
-                            <Text c="dimmed" size="sm">This feature isn't built yet — coming in a future update.</Text>
-                        </div>
+                                <div ref={(el) => { sectionRefs.current.messages = el; }}>
+                                    <Title order={5} mb="sm">Messages</Title>
+                                    <Text c="dimmed" size="sm">This feature isn't built yet — coming in a future update.</Text>
+                                </div>
 
-                        <div ref={(el) => { sectionRefs.current.messages = el; }}>
-                            <Title order={5} mb="sm">Messages</Title>
-                            <Text c="dimmed" size="sm">This feature isn't built yet — coming in a future update.</Text>
-                        </div>
-
-                        <div ref={(el) => { sectionRefs.current.analitics = el; }}>
-                            <Title order={5} mb="sm">Analitics</Title>
-                            <Stack gap={4}>
-                                <Text size="sm" fw={600}>Progress</Text>
-                                <Progress value={task.progress ?? 0} size="lg" />
-                                <Text size="xs" c="dimmed">
-                                    {Math.round(task.progress ?? 0)}% — derived from cumulative work reports, not editable here.
-                                </Text>
-                            </Stack>
-                        </div>
+                                <div ref={(el) => { sectionRefs.current.analitics = el; }}>
+                                    <Title order={5} mb="sm">Analitics</Title>
+                                    <Stack gap={4}>
+                                        <Text size="sm" fw={600}>Progress</Text>
+                                        <Progress value={task.progress ?? 0} size="lg" />
+                                        <Text size="xs" c="dimmed">
+                                            {Math.round(task.progress ?? 0)}% — derived from cumulative work reports, not editable here.
+                                        </Text>
+                                    </Stack>
+                                </div>
+                        </>
 
                         <Group justify="space-between" pt="md">
                             <Button variant="subtle" color="red" leftSection={<IconTrash size={14} />} onClick={handleDelete} loading={deleting}>
@@ -532,6 +523,7 @@ export function TaskEditDrawer({
                                 <Button onClick={handleSubmit} loading={saving}>Save</Button>
                             </Group>
                         </Group>
+
                     </Stack>
                 </ScrollArea>
 

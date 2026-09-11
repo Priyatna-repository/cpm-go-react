@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Anchor, Breadcrumbs, Stack, Text } from '@mantine/core';
+import { Anchor, Breadcrumbs, Stack, Text, Title, Center } from '@mantine/core';
+import { useLayoutChrome } from '../../layouts/LayoutChromeContext';
 import * as projectsApi from '../../api/projects';
 import type { Project } from '../../api/projects';
 import { GanttPanel } from '../../components/GanttPanel';
@@ -9,6 +10,7 @@ import { errorMessage } from '../../utils/errors';
 export function TasksPage() {
   const { id } = useParams<{ id: string }>();
   const projectId = Number(id);
+  const { fullscreen } = useLayoutChrome();
 
   const [project, setProject] = useState<Project | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,11 +53,17 @@ export function TasksPage() {
             : undefined,
       }}
     >
-      <Breadcrumbs mb="xs">
+      {error && <Text c="red">{error}</Text>}
+      { fullscreen ? (
+        <Center py={'sm'}>
+          <Title order={4}>{project?.name ?? '...'}</Title>
+        </Center>
+      ):(
+        <Breadcrumbs mb="xs">
         <Anchor component={Link} to="/projects" size="sm" c="dimmed">Projects</Anchor>
         <Text size="sm">{project?.name ?? '…'}</Text>
       </Breadcrumbs>
-      {error && <Text c="red">{error}</Text>}
+      )}
       <div
         ref={ganttContainerRef}
         style={ganttHeight != null ? { height: ganttHeight } : { flex: 1, minHeight: 0 }}

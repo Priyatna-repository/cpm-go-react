@@ -125,6 +125,40 @@ func (s *TaskDependencyService) wouldCreateCycle(tx *gorm.DB, successorID, prede
 	return false, nil
 }
 
+type UpdateDependencyInput struct {
+	RelationType models.TaskRelationType
+	LagDays      int
+}
+
+// Update only touches RelationType/LagDays — which two tasks a dependency
+// connects is immutable after creation (SVAR's own link editor only ever
+// exposes type/lag as editable; changing the endpoints is delete-and-recreate).
+// map-based Updates (not a struct) so LagDays=0 is actually written — GORM's
+// struct-based Updates silently skips zero-value fields.
+func (s *TaskDependencyService) Update(projectID, dependencyID uint, input UpdateDependencyInput) (*models.TaskDependency, error) {
+	if !validRelationType(input.RelationType) {
+		return nil, ErrInvalidRelationType
+	}
+	updates := map[string]interface{}{
+		"relation_type": input.RelationType,
+		"lag_days":      input.LagDays,
+	}
+	result := s.db.Model(&models.TaskDependency{}).
+		Where("id = ? AND task_id IN (SELECT id FROM tasks WHERE project_id = ?)", dependencyID, projectID).
+		Updates(updates)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil, gorm.ErrRecordNotFound
+	}
+	var dep models.TaskDependency
+	if err := s.db.First(&dep, dependencyID).Error; err != nil {
+		return nil, err
+	}
+	return &dep, nil
+}
+
 func (s *TaskDependencyService) Delete(projectID, dependencyID uint) error {
 	result := s.db.
 		Where("id = ? AND task_id IN (SELECT id FROM tasks WHERE project_id = ?)", dependencyID, projectID).

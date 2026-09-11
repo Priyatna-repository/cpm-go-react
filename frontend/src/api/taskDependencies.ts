@@ -31,6 +31,19 @@ export async function createTaskDependency(
   return data;
 }
 
+export async function updateTaskDependency(
+  projectId: number,
+  dependencyId: number,
+  relationType: TaskRelationType,
+  lagDays: number,
+): Promise<TaskDependency> {
+  const { data } = await apiClient.put<TaskDependency>(
+    `/api/v1/projects/${projectId}/dependencies/${dependencyId}`,
+    { relation_type: relationType, lag_days: lagDays },
+  );
+  return data;
+}
+
 export async function deleteTaskDependency(projectId: number, dependencyId: number): Promise<void> {
   await apiClient.delete(`/api/v1/projects/${projectId}/dependencies/${dependencyId}`);
 }

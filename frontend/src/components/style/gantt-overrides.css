@@ -1,0 +1,16 @@
+/* @svar-ui/react-gantt's <Willow> theme wrapper renders a plain
+   `.wx-willow-theme` div with no height/flex CSS of its own (verified —
+   its bundled CSS only defines color/font custom properties). Since
+   Willow doesn't accept a style/className prop to fix this from the
+   component tree, it's targeted here directly: without this, Willow's
+   content (Toolbar + Gantt) only takes up its own intrinsic height
+   inside the properly-sized flex:1 container around it, leaving the
+   rest of that container empty — which is also why the empty area grew
+   or shrank with row count instead of with the resize handle: nothing
+   below the last row was ever driven by the container's real height. */
+.wx-willow-theme {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}

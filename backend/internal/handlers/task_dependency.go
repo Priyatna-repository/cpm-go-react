@@ -106,6 +106,53 @@ func (h *TaskDependencyHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, toTaskDependencyResponse(dep))
 }
 
+type UpdateTaskDependencyRequest struct {
+	RelationType string `json:"relation_type" binding:"required"`
+	LagDays      int    `json:"lag_days"`
+}
+
+// UpdateTaskDependency godoc
+// @Summary      Change a dependency's relation type or lag
+// @Description  Requires task.manage_dependencies + project access. The two tasks it connects can't be changed — delete and recreate instead.
+// @Tags         task-dependencies
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id       path      int                          true  "Project ID"
+// @Param        depId    path      int                          true  "Dependency ID"
+// @Param        request  body      UpdateTaskDependencyRequest  true  "New relation type / lag"
+// @Success      200  {object}  TaskDependencyResponse
+// @Failure      400  {object}  map[string]string
+// @Failure      401  {object}  map[string]string
+// @Failure      403  {object}  map[string]string
+// @Failure      404  {object}  map[string]string
+// @Router       /api/v1/projects/{id}/dependencies/{depId} [put]
+func (h *TaskDependencyHandler) Update(c *gin.Context) {
+	projectID, err := parseUintParam(c, "id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project id"})
+		return
+	}
+	depID, err := parseUintParam(c, "depId")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid dependency id"})
+		return
+	}
+	var req UpdateTaskDependencyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "relation_type is required"})
+		return
+	}
+	dep, err := h.deps.Update(projectID, depID, services.UpdateDependencyInput{
+		RelationType: models.TaskRelationType(req.RelationType), LagDays: req.LagDays,
+	})
+	if err != nil {
+		respondDependencyError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, toTaskDependencyResponse(dep))
+}
+
 // DeleteTaskDependency godoc
 // @Summary      Remove a dependency
 // @Tags         task-dependencies

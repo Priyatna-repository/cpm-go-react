@@ -172,6 +172,11 @@ func Setup(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 				middleware.RequireProjectAccess(projectService),
 				taskDependencyHandler.Create,
 			)
+			dependencies.PUT("/:depId",
+				middleware.RequirePermission(permService, "task.manage_dependencies"),
+				middleware.RequireProjectAccess(projectService),
+				taskDependencyHandler.Update,
+			)
 			dependencies.DELETE("/:depId",
 				middleware.RequirePermission(permService, "task.manage_dependencies"),
 				middleware.RequireProjectAccess(projectService),

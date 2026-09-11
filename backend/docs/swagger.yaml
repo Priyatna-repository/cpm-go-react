@@ -463,6 +463,15 @@ definitions:
     required:
     - version
     type: object
+  handlers.UpdateTaskDependencyRequest:
+    properties:
+      lag_days:
+        type: integer
+      relation_type:
+        type: string
+    required:
+    - relation_type
+    type: object
   handlers.UserListResponses:
     properties:
       data:
@@ -2015,6 +2024,64 @@ paths:
       security:
       - BearerAuth: []
       summary: Remove a dependency
+      tags:
+      - task-dependencies
+    put:
+      consumes:
+      - application/json
+      description: Requires task.manage_dependencies + project access. The two tasks
+        it connects can't be changed — delete and recreate instead.
+      parameters:
+      - description: Project ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Dependency ID
+        in: path
+        name: depId
+        required: true
+        type: integer
+      - description: New relation type / lag
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateTaskDependencyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.TaskDependencyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Change a dependency's relation type or lag
       tags:
       - task-dependencies
   /api/v1/projects/{id}/force:

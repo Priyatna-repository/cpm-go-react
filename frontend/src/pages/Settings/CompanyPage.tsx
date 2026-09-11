@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import {
-    Alert, Button, Group, Paper, Select, Stack, TextInput, Title,
+    Alert, Button, Group, Paper, Select, SimpleGrid, Stack, TextInput, Title,
 } from '@mantine/core';
 import { LogoUpload } from '../../components/LogoUpload';
 import { IconAlertTriangle } from '@tabler/icons-react';
@@ -100,8 +100,8 @@ export function CompanyPage() {
     return null;
   }
 
-  return (
-    <Stack p="xl" maw={560}>
+   return (
+    <Stack p="xl">
       <Title order={2}>Company Profile</Title>
 
       {error && (
@@ -111,61 +111,72 @@ export function CompanyPage() {
       )}
       {saved && <Alert color="green">Saved.</Alert>}
 
-      <Paper radius="md" p="lg" withBorder>
-        <form onSubmit={handleSubmit}>
-          <Group align="flex-start">
-            <LogoUpload
-              currentUrl={logoUrl}
-              fallbackText={name}
-              disabled={!canEdit}
-              onChange={setLogoFile}
-            />
-            <Stack gap="xs" style={{ flex: 1 }}>
-              <TextInput
-                label="Name"
-                required
+      <form onSubmit={handleSubmit}>
+        <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
+          <Paper radius="md" p="lg" withBorder>
+            <Title order={4} mb="md">Branding</Title>
+            <Group align="flex-start">
+              <LogoUpload
+                currentUrl={logoUrl}
+                fallbackText={name}
                 disabled={!canEdit}
-                value={name}
-                onChange={(e) => setName(e.currentTarget.value)}
+                onChange={setLogoFile}
               />
+              <Stack gap="xs" style={{ flex: 1 }}>
+                <TextInput
+                  label="Name"
+                  required
+                  disabled={!canEdit}
+                  value={name}
+                  onChange={(e) => setName(e.currentTarget.value)}
+                />
+                <Select
+                  label="Currency"
+                  disabled={!canEdit}
+                  searchable
+                  data={currencies.map((c) => ({ value: String(c.id), label: `${c.name} (${c.symbol})` }))}
+                  value={currencyId}
+                  onChange={setCurrencyId}
+                />
+              </Stack>
+            </Group>
+          </Paper>
+
+          <Paper radius="md" p="lg" withBorder>
+            <Title order={4} mb="md">Contact</Title>
+            <Stack gap="xs">
+              <TextInput label="Email" disabled={!canEdit} value={email} onChange={(e) => setEmail(e.currentTarget.value)} />
+              <TextInput label="Phone" disabled={!canEdit} value={phone} onChange={(e) => setPhone(e.currentTarget.value)} />
+              <TextInput label="Website" disabled={!canEdit} value={web} onChange={(e) => setWeb(e.currentTarget.value)} />
+            </Stack>
+          </Paper>
+
+          <Paper radius="md" p="lg" withBorder style={{ gridColumn: '1 / -1' }}>
+            <Title order={4} mb="md">Address</Title>
+            <Stack gap="xs">
+              <TextInput label="Address" disabled={!canEdit} value={address} onChange={(e) => setAddress(e.currentTarget.value)} />
+              <Group grow>
+                <TextInput label="City" disabled={!canEdit} value={city} onChange={(e) => setCity(e.currentTarget.value)} />
+                <TextInput label="Postal code" disabled={!canEdit} value={postalCode} onChange={(e) => setPostalCode(e.currentTarget.value)} />
+              </Group>
               <Select
-                label="Currency"
+                label="Country"
                 disabled={!canEdit}
                 searchable
-                data={currencies.map((c) => ({ value: String(c.id), label: `${c.name} (${c.symbol})` }))}
-                value={currencyId}
-                onChange={setCurrencyId}
+                data={countries.map((c) => ({ value: String(c.id), label: c.name }))}
+                value={countryId}
+                onChange={setCountryId}
               />
             </Stack>
-          </Group>
+          </Paper>
+        </SimpleGrid>
 
-          <TextInput mt="md" label="Address" disabled={!canEdit} value={address} onChange={(e) => setAddress(e.currentTarget.value)} />
-          <Group grow mt="md">
-            <TextInput label="City" disabled={!canEdit} value={city} onChange={(e) => setCity(e.currentTarget.value)} />
-            <TextInput label="Postal code" disabled={!canEdit} value={postalCode} onChange={(e) => setPostalCode(e.currentTarget.value)} />
-          </Group>
-          <Select
-            mt="md"
-            label="Country"
-            disabled={!canEdit}
-            searchable
-            data={countries.map((c) => ({ value: String(c.id), label: c.name }))}
-            value={countryId}
-            onChange={setCountryId}
-          />
-          <TextInput mt="md" label="Email" disabled={!canEdit} value={email} onChange={(e) => setEmail(e.currentTarget.value)} />
-          <Group grow mt="md">
-            <TextInput label="Phone" disabled={!canEdit} value={phone} onChange={(e) => setPhone(e.currentTarget.value)} />
-            <TextInput label="Website" disabled={!canEdit} value={web} onChange={(e) => setWeb(e.currentTarget.value)} />
-          </Group>
-
-          {canEdit && (
-            <Button type="submit" mt="xl" loading={saving}>
-              Save
-            </Button>
-          )}
-        </form>
-      </Paper>
+        {canEdit && (
+          <Button type="submit" mt="xl" loading={saving}>
+            Save
+          </Button>
+        )}
+      </form>
     </Stack>
   );
 }

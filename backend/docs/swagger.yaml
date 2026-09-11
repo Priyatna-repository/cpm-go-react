@@ -323,6 +323,13 @@ definitions:
       name:
         type: string
     type: object
+  handlers.RescheduleTaskRequest:
+    properties:
+      end_date:
+        type: string
+      start_date:
+        type: string
+    type: object
   handlers.RoleResponse:
     properties:
       id:
@@ -339,6 +346,112 @@ definitions:
         example: 1
         type: integer
     type: object
+  handlers.SetTaskCompletedRequest:
+    properties:
+      completed:
+        type: boolean
+    type: object
+  handlers.TaskDependencyRequest:
+    properties:
+      depends_on_task_id:
+        type: integer
+      lag_days:
+        type: integer
+      relation_type:
+        type: string
+      task_id:
+        type: integer
+    required:
+    - depends_on_task_id
+    - relation_type
+    - task_id
+    type: object
+  handlers.TaskDependencyResponse:
+    properties:
+      depends_on_task_id:
+        type: integer
+      id:
+        type: integer
+      lag_days:
+        type: integer
+      relation_type:
+        type: string
+      task_id:
+        type: integer
+    type: object
+  handlers.TaskRequest:
+    properties:
+      assigned_to_user_id:
+        type: integer
+      budget_actual:
+        type: number
+      budget_plan:
+        type: number
+      description:
+        type: string
+      end_date:
+        type: string
+      name:
+        type: string
+      parent_task_id:
+        type: integer
+      start_date:
+        type: string
+      status_label_id:
+        type: integer
+      type:
+        type: string
+      weight:
+        type: number
+    required:
+    - name
+    - type
+    type: object
+  handlers.TaskResponse:
+    properties:
+      archived_at:
+        type: string
+      assigned_to_user:
+        $ref: '#/definitions/handlers.ProjectUserRef'
+      budget_actual:
+        type: number
+      budget_plan:
+        type: number
+      completed_at:
+        type: string
+      created_at:
+        type: string
+      created_by:
+        $ref: '#/definitions/handlers.ProjectUserRef'
+      description:
+        type: string
+      end_date:
+        type: string
+      id:
+        type: integer
+      is_completed:
+        type: boolean
+      name:
+        type: string
+      number:
+        type: integer
+      order_column:
+        type: integer
+      parent_task_id:
+        type: integer
+      progress:
+        type: number
+      project_id:
+        type: integer
+      start_date:
+        type: string
+      status_label:
+        $ref: '#/definitions/handlers.ProjectLabelRef'
+      type:
+        type: string
+      weight:
+        type: number
+    type: object
   handlers.UpdateRolePermissionsRequest:
     properties:
       permissions:
@@ -349,6 +462,15 @@ definitions:
         type: integer
     required:
     - version
+    type: object
+  handlers.UpdateTaskDependencyRequest:
+    properties:
+      lag_days:
+        type: integer
+      relation_type:
+        type: string
+    required:
+    - relation_type
     type: object
   handlers.UserListResponses:
     properties:
@@ -1776,6 +1898,192 @@ paths:
       summary: Manage project access
       tags:
       - projects
+  /api/v1/projects/{id}/dependencies:
+    get:
+      description: Not paginated — the Gantt needs the full set at once to draw arrows.
+        Requires task.view + project access.
+      parameters:
+      - description: Project ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.TaskDependencyResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List every dependency edge among a project's tasks
+      tags:
+      - task-dependencies
+    post:
+      consumes:
+      - application/json
+      description: Requires task.manage_dependencies + project access. Rejects self-dependencies
+        and cycles.
+      parameters:
+      - description: Project ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Dependency
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.TaskDependencyRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.TaskDependencyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a dependency between two tasks
+      tags:
+      - task-dependencies
+  /api/v1/projects/{id}/dependencies/{depId}:
+    delete:
+      parameters:
+      - description: Project ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Dependency ID
+        in: path
+        name: depId
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Remove a dependency
+      tags:
+      - task-dependencies
+    put:
+      consumes:
+      - application/json
+      description: Requires task.manage_dependencies + project access. The two tasks
+        it connects can't be changed — delete and recreate instead.
+      parameters:
+      - description: Project ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Dependency ID
+        in: path
+        name: depId
+        required: true
+        type: integer
+      - description: New relation type / lag
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateTaskDependencyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.TaskDependencyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Change a dependency's relation type or lag
+      tags:
+      - task-dependencies
   /api/v1/projects/{id}/force:
     delete:
       parameters:
@@ -1844,6 +2152,425 @@ paths:
       summary: Restore an archived project
       tags:
       - projects
+  /api/v1/projects/{id}/tasks:
+    get:
+      description: Optionally filter by parent_task_id. Requires task.view + project
+        access.
+      parameters:
+      - description: Project ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Filter by parent task
+        in: query
+        name: parent_task_id
+        type: integer
+      - description: Show archived instead of active
+        in: query
+        name: archived
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.TaskResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List a project's tasks
+      tags:
+      - tasks
+    post:
+      consumes:
+      - application/json
+      description: Requires task.create + project access.
+      parameters:
+      - description: Project ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Task
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.TaskRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.TaskResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a task
+      tags:
+      - tasks
+  /api/v1/projects/{id}/tasks/{taskId}:
+    delete:
+      parameters:
+      - description: Project ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Task ID
+        in: path
+        name: taskId
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Archive a task
+      tags:
+      - tasks
+    get:
+      parameters:
+      - description: Project ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Task ID
+        in: path
+        name: taskId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.TaskResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get a task
+      tags:
+      - tasks
+    put:
+      consumes:
+      - application/json
+      description: Requires task.edit + project access.
+      parameters:
+      - description: Project ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Task ID
+        in: path
+        name: taskId
+        required: true
+        type: integer
+      - description: Task
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.TaskRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.TaskResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update a task
+      tags:
+      - tasks
+  /api/v1/projects/{id}/tasks/{taskId}/complete:
+    put:
+      consumes:
+      - application/json
+      description: Requires task.edit + project access. Also stamps/clears completed_at.
+      parameters:
+      - description: Project ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Task ID
+        in: path
+        name: taskId
+        required: true
+        type: integer
+      - description: Completed flag
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.SetTaskCompletedRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.TaskResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Mark a task done or not done
+      tags:
+      - tasks
+  /api/v1/projects/{id}/tasks/{taskId}/force:
+    delete:
+      parameters:
+      - description: Project ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Task ID
+        in: path
+        name: taskId
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Permanently delete a task
+      tags:
+      - tasks
+  /api/v1/projects/{id}/tasks/{taskId}/reschedule:
+    put:
+      consumes:
+      - application/json
+      description: Requires task.edit + project access. Returns every task whose dates
+        changed (the moved task included).
+      parameters:
+      - description: Project ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Task ID
+        in: path
+        name: taskId
+        required: true
+        type: integer
+      - description: New dates
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RescheduleTaskRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.TaskResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Move a task's dates and cascade the change through its dependents
+      tags:
+      - tasks
+  /api/v1/projects/{id}/tasks/{taskId}/restore:
+    post:
+      parameters:
+      - description: Project ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Task ID
+        in: path
+        name: taskId
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Restore an archived task
+      tags:
+      - tasks
   /api/v1/roles:
     get:
       description: Returns every role except admin (whose access can't be restricted),

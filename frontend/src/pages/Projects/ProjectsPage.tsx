@@ -5,8 +5,9 @@ import {
 } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
 import {
-  IconAlertTriangle, IconArchive, IconEdit, IconPlus, IconRestore, IconTrash, IconUsers,
+  IconAlertTriangle, IconArchive, IconEdit, IconListDetails, IconPlus, IconRestore, IconTrash, IconUsers,
 } from '@tabler/icons-react';
+import { Link } from 'react-router-dom';
 import * as api from '../../api/projects';
 import type { Project, ProjectInput } from '../../api/projects';
 import * as clientCompaniesApi from '../../api/clientCompanies';
@@ -17,6 +18,7 @@ import * as labelsApi from '../../api/labels';
 import type { Label } from '../../api/labels';
 import { useAuth } from '../../auth/AuthContext';
 import { errorMessage } from '../../utils/errors';
+import { resolveIcon } from '../../utils/tablerIcons';
 
 const emptyForm: ProjectInput = { name: '', status_label_ids: [] };
 
@@ -188,8 +190,8 @@ export function ProjectsPage() {
   }
 
   const selectedCompany = form.client_company_id
-   ? companies.find((c) => c.id === form.client_company_id)
-   : undefined;
+    ? companies.find((c) => c.id === form.client_company_id)
+    : undefined;
   const canManageAccess = can('project.manage_access');
   const clientLocked = editingId !== null && !canManageAccess;
 
@@ -250,15 +252,30 @@ export function ProjectsPage() {
                 </Table.Td>
                 <Table.Td>
                   <Group gap={4}>
-                    {project.status_labels.map((l) => (
-                      <Badge key={l.id} style={l.color ? { backgroundColor: l.color } : undefined}>
-                        {l.name}
-                      </Badge>
-                    ))}
+                    {project.status_labels.map((l) => {
+                      const Icon = resolveIcon(statusOptions.find((s) => s.id === l.id)?.icon);
+                      return (
+                        <Badge
+                          key={l.id}
+                          leftSection={Icon ? <Icon size={12} /> : null}
+                          style={l.color ? { backgroundColor: l.color } : undefined}
+                        >
+                          {l.name}
+                        </Badge>
+                      );
+                    })}
+
                   </Group>
                 </Table.Td>
                 <Table.Td>
                   <Group gap="xs">
+                    {can('task.view') && !project.archived_at && (
+                      <Tooltip label="Tasks">
+                        <ActionIcon variant="subtle" component={Link} to={`/projects/${project.id}/tasks`}>
+                          <IconListDetails size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
                     {can('project.edit') && !project.archived_at && (
                       <Tooltip label="Edit">
                         <ActionIcon variant="subtle" onClick={() => openEdit(project)}>
@@ -330,7 +347,7 @@ export function ProjectsPage() {
               minRows={2}
             />
 
-              <div>
+            <div>
               <Text size="sm" fw={500} mb={2}>Client</Text>
               <Text size="xs" c="dimmed" mb={6}>
                 Whoever is linked here automatically gets access to view this project —
@@ -346,7 +363,7 @@ export function ProjectsPage() {
                   { label: 'Individual client (only this person)', value: 'individual' },
                 ]}
               />
-             {clientLocked && (
+              {clientLocked && (
                 <Text size="xs" c="orange" mb={6}>
                   You don't have permission to change this project's client — contact someone with
                   "manage access" rights if it needs to change.

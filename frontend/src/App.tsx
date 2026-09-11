@@ -9,6 +9,7 @@ import { ProtectedRoute } from './routes/ProtectedRoute';
 import { RequirePermission } from './routes/RequirePermission';
 import { MainLayout } from './layouts/MainLayout';
 import { ProjectsPage } from './pages/Projects/ProjectsPage';
+import { TasksPage } from './pages/Projects/TasksPage';
 import { ClientUsersPage } from './pages/Users/ClientUsersPage';
 import { UsersPage } from './pages/Users/UsersPage';
 
@@ -20,8 +21,11 @@ export default function App() {
         <Route element={<MainLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route element={<RequirePermission permission="project.view" />}>
-          <Route path="/projects" element={<ProjectsPage />} />
-        </Route>
+            <Route path="/projects" element={<ProjectsPage />} />
+          </Route>
+          <Route element={<RequirePermission permission="task.view" />}>
+            <Route path="/projects/:id/tasks" element={<TasksPage />} />
+          </Route>
           <Route element={<RequirePermission permission="roles.view" />}>
             <Route path="/settings/roles" element={<RolesPermissionsPage />} />
           </Route>
